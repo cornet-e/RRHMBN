@@ -2,7 +2,6 @@ streamlit
 panda
 numpy
 plotly.express
-os
 pickle
 lifelines
 lifelines.statistics
