@@ -3,3 +3,4 @@ panda
 numpy
 plotly.express
 lifelines
+openpyxl
