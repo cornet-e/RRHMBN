@@ -2,7 +2,6 @@ streamlit
 panda
 numpy
 plotly.express
-pickle
 lifelines
 lifelines.statistics
 plotly.graph_objs
