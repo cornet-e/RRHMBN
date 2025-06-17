@@ -3,5 +3,3 @@ panda
 numpy
 plotly.express
 lifelines
-plotly.graph_objs
-plotly.subplots
