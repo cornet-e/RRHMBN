@@ -39,14 +39,19 @@ if file is not None:
     try:
         if isinstance(file, str):  # Fichier local
             rrhmbn = pd.read_excel(file, engine="openpyxl")
-        else:  # Fichier importé
+        else:  # Fichier importé (Streamlit uploader)
             rrhmbn = pd.read_excel(file, engine="openpyxl")
 
-        # Renommer les colonnes critiques
-        rrhmbn.columns.values[2] = "sex"
-        rrhmbn.columns.values[12] = "age"
-        rrhmbn.columns.values[16] = "fup"
-        rrhmbn.columns.values[17] = "event"
+        # 🔄 Renommer les colonnes critiques par leur nom actuel
+        mapping = {
+            "_SexePatient": "sex",
+            "Age_Au_Diag": "age",
+            "Follow_up_months": "fup",
+            "EtatVital": "event"
+        }
+
+        # Appliquer le renommage uniquement si les colonnes existent
+        rrhmbn.rename(columns={k: v for k, v in mapping.items() if k in rrhmbn.columns}, inplace=True)
 
         # Corriger les types
         for col in rrhmbn.columns:
