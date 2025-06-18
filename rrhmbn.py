@@ -203,18 +203,18 @@ if 'rrhmbn_valide' in locals():
         hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_XT_label"] == xt_label_sel]
         hm_libelle = hm["patho_sous_type_XT_label"].iloc[0] if not hm.empty else None
 
-    # Affichage et sauvegarde
-    if 'hm' in locals() and not hm.empty:
-        st.success(f"✅ Vous avez sélectionné : **{hm_libelle}** ({len(hm)} cas)")
-        st.dataframe(hm)
+# Affichage et sauvegarde
+if 'hm' in locals() and not hm.empty:
+    st.success(f"✅ Vous avez sélectionné : **{hm_libelle}** ({len(hm)} cas)")
+    st.dataframe(hm)
 
-        # Option pour sauvegarder
-        if st.button("💾 Sauvegarder les objets `hm` et `hm_libelle`"):
-            with open("hm.pkl", "wb") as f:
-                pickle.dump(hm, f)
-            with open("hm_libelle.pkl", "wb") as f:
-                pickle.dump(hm_libelle, f)
-            st.success("Objets sauvegardés avec succès (hm.pkl et hm_libelle.pkl)")
+    # Option pour sauvegarder
+    if st.button("💾 Sauvegarder les objets `hm` et `hm_libelle`"):
+        with open("hm.pkl", "wb") as f:
+            pickle.dump(hm, f)
+        with open("hm_libelle.pkl", "wb") as f:
+            pickle.dump(hm_libelle, f)
+        st.success("Objets sauvegardés avec succès (hm.pkl et hm_libelle.pkl)")
     
     st.title("📈 Analyse de survie par sexe (Kaplan-Meier)")
 
@@ -399,7 +399,7 @@ fig2.update_layout(
 
 st.plotly_chart(fig2, use_container_width=True)
 
-
+### Survie par sexe et groupe d'âge "0-25 ans", "26-50 ans", "51-75 ans", "75 ans+"
 #  survie par sexe et groupe age calculé
 
 bins = [-np.inf, 25, 50, 75, np.inf]
@@ -504,31 +504,39 @@ fig3.update_layout(
 
 st.plotly_chart(fig3, use_container_width=True)
 
+### Survie par sexe et Quartiles calculés d'âge
 # Calculer les quartiles de la colonne 'age'
 hm4 = hm.copy()
-quartiles_hm4 = hm4['age'].quantile([0, 0.25, 0.5, 0.75, 1.0]).values
+# Calculer les quartiles uniques
+quartiles_hm4 = sorted(hm4['age'].quantile([0, 0.25, 0.5, 0.75, 1.0]).unique())
 
-# Créer les labels dynamiques pour les quartiles
-labels = [
-    f"Q1 - ≤ {round(quartiles_hm4[1])} ans",
-    f"Q2 - {round(quartiles_hm4[1])} - {round(quartiles_hm4[2])} ans",
-    f"Q3 - {round(quartiles_hm4[2])} - {round(quartiles_hm4[3])} ans",
-    f"Q4 - > {round(quartiles_hm4[3])} ans"
-]
+# Vérifier qu'on a bien au moins 4 tranches
+if len(quartiles_hm4) >= 4:
+    # Créer les labels adaptés
+    labels = []
+    for i in range(1, len(quartiles_hm4)):
+        if i == 1:
+            labels.append(f"Q{i} - ≤ {round(quartiles_hm4[i])} ans")
+        elif i == len(quartiles_hm4)-1:
+            labels.append(f"Q{i} - > {round(quartiles_hm4[i-1])} ans")
+        else:
+            labels.append(f"Q{i} - {round(quartiles_hm4[i-1])} - {round(quartiles_hm4[i])} ans")
 
-# Créer la colonne 'grp_age' avec cut selon les quartiles
-
-hm4['grp_age'] = pd.cut(
-    hm4['age'],
-    bins=quartiles_hm4,
-    labels=labels,
-    include_lowest=True,
-    right=False
-).astype(str)
+    # Découper selon les bornes uniques
+    hm4['grp_age'] = pd.cut(
+        hm4['age'],
+        bins=quartiles_hm4,
+        labels=labels,
+        include_lowest=True,
+        right=False
+    ).astype(str)
+else:
+    st.warning("Les quantiles d’âge ne permettent pas une division en quartiles distincts.")
 
 # Préparer les données pour survie
 df4 = hm4[['fup', 'event', 'sex', 'grp_age']].dropna()
 df4['sex'] = df4['sex'].astype(str)
+df4 = df4[df4['grp_age'] != 'nan']
 
 # Calculer p-values log-rank par groupe d'âge (quartile)
 p_values_quartiles = []
