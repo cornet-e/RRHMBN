@@ -42,18 +42,6 @@ if file is not None:
         else:  # Fichier importé (Streamlit uploader)
             rrhmbn_brut = pd.read_excel(file, engine="openpyxl")
 
-
-
-
-
-
-
-
-
-
-
-
-
         ### Ajout colonnes 
         
         # --- Paramètres des chemins des fichiers ---
