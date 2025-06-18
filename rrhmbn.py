@@ -38,9 +38,121 @@ else:
 if file is not None:
     try:
         if isinstance(file, str):  # Fichier local
-            rrhmbn = pd.read_excel(file, engine="openpyxl")
+            rrhmbn_brut = pd.read_excel(file, engine="openpyxl")
         else:  # Fichier importé (Streamlit uploader)
-            rrhmbn = pd.read_excel(file, engine="openpyxl")
+            rrhmbn_brut = pd.read_excel(file, engine="openpyxl")
+
+
+
+
+
+
+
+
+
+
+
+
+
+        ### Ajout colonnes 
+        
+        # --- Paramètres des chemins des fichiers ---
+        fichier_select = "Import-select.xlsx"
+
+        # --- Lecture des fichiers avec ligne d'en-tête ---
+        #df_brut = pd.read_excel(fichier_brut, header=0)
+        df_select = pd.read_excel(fichier_select, header=0)
+
+        # --- Colonnes à extraire : on prend les noms de colonnes du fichier Import-select ---
+        colonnes_requises = df_select.columns.str.strip().tolist()
+
+        # --- Vérification des colonnes réellement présentes dans le fichier brut ---
+        colonnes_presentes = [col for col in colonnes_requises if col in rrhmbn_brut.columns]
+        colonnes_absentes = [col for col in colonnes_requises if col not in rrhmbn_brut.columns]
+
+        # --- Affichage console pour information ---
+        print("✅ Colonnes trouvées dans le fichier brut :")
+        print(colonnes_presentes)
+
+        if colonnes_absentes:
+            print("\n⚠️ Colonnes absentes dans le fichier brut :")
+            print(colonnes_absentes)
+
+        # --- Extraction des colonnes présentes ---
+        df_filtre = rrhmbn_brut[colonnes_presentes].copy()  # ✅ Copie sécurisée
+
+        # Conversion explicite en datetime
+        df_filtre["DateDuDiag"] = pd.to_datetime(df_filtre["DateDuDiag"], errors="coerce")
+        df_filtre["DateDernieresNouvelles"] = pd.to_datetime(df_filtre["DateDernieresNouvelles"], errors="coerce")
+
+        # Calcul de la durée de suivi en mois
+        df_filtre["Follow_up_months"] = (
+            (df_filtre["DateDernieresNouvelles"] - df_filtre["DateDuDiag"]).dt.days / 30.44
+        ).round(1)
+
+        # --- ajout colonne "Cas_valides" ---
+
+        # Normaliser les colonnes en minuscules chaînes de caractères (utile si valeurs booléennes ou mixtes)
+        colonnes_a_verifier = ["Exclusion", "A_Surveiller", "Pre_Saisie"]
+        for col in colonnes_a_verifier:
+            df_filtre[col] = df_filtre[col].astype(str).str.upper().str.strip()
+
+        # Créer la colonne Cas_valides : 1 si toutes les 3 colonnes sont "FALSE", sinon 0
+        df_filtre["Cas_valides"] = (
+            (df_filtre["Exclusion"] == "FALSE") &
+            (df_filtre["A_Surveiller"] == "FALSE") &
+            (df_filtre["Pre_Saisie"] == "FALSE")
+        ).astype(int)
+
+        # Définir les bornes et les étiquettes personnalisées
+        bornes = [0, 5, 10, 15, 25, 30, 35, 40, 45, 50, 55, 60,
+                65, 70, 75, 80, 85, 90, 95, float('inf')]
+        etiquettes = [
+            "[00;05[", "[05;10[", "[10;15[", "[15;25[", "[25;30[", "[30;35[",
+            "[35;40[", "[40;45[", "[45;50[", "[50;55[", "[55;60[", "[60;65[",
+            "[65;70[", "[70;75[", "[75;80[", "[80;85[", "[85;90[", "[90;95[", "95+"
+        ]
+
+        # Créer la colonne "Groupe_age"
+        df_filtre["groupe_age"] = pd.cut(
+            df_filtre["Age_Au_Diag"],
+            bins=bornes,
+            labels=etiquettes,
+            right=False  # pour avoir des intervalles du type [x;y[
+        )
+
+        # Créer la colonne "annee_diag"
+        df_filtre["annee_diag"] = df_filtre["DateDuDiag"].dt.year
+
+        # Charger le fichier ICDO
+        df_icdo = pd.read_excel("ICDO.xlsx")
+
+        # Nettoyer la clé de jointure dans les deux fichiers
+        df_filtre["Code_MORPHO_Diag"] = df_filtre["Code_MORPHO_Diag"].apply(lambda x: str(int(x)).strip() if pd.notnull(x) else "")
+        df_icdo["ICD-O-3"] = df_icdo["ICD-O-3"].astype(str).str.strip()
+
+        # Merge sur le code morpho
+        df_final = df_filtre.merge(
+            df_icdo[[
+                "ICD-O-3",
+                "patho_sous_type", "patho_sous_type_label",
+                "patho_groupe", "patho_groupe_label",
+                "patho_sous_type_XT", "patho_sous_type_XT_label"
+            ]],
+            left_on="Code_MORPHO_Diag",
+            right_on="ICD-O-3",
+            how="left"
+        )
+
+        # supprimer la colonne 'ICD-O-3' (doublon)
+        df_final = df_final.drop(columns=["ICD-O-3"])
+
+        # --- Sauvegarde du fichier filtré ---
+        # fichier_sortie = "rrhmbn.xlsx"
+        # df_final.to_excel(fichier_sortie, index=False)
+        #print(f"\n💾 Fichier sauvegardé : {fichier_sortie}")
+
+        rrhmbn = df_final
 
         # 🔄 Renommer les colonnes critiques par leur nom actuel
         mapping = {
