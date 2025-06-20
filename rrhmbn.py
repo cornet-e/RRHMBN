@@ -189,34 +189,34 @@ top_pathos = rrhmbn_valide["patho_sous_type_label"].value_counts().head(10)
 st.bar_chart(top_pathos)
 
 # 3. Statistiques sur l'âge
-st.subheader("🎂 Statistiques d'âge")
-med_age = rrhmbn_valide["age"].median()
-q1, q3 = rrhmbn_valide["age"].quantile([0.25, 0.75])
-st.markdown(f"- Médiane : **{med_age:.1f}** ans")
-st.markdown(f"- 1er quartile : **{q1:.1f}** ans")
-st.markdown(f"- 3e quartile : **{q3:.1f}** ans")
+#st.subheader("🎂 Statistiques d'âge")
+#med_age = rrhmbn_valide["age"].median()
+#q1, q3 = rrhmbn_valide["age"].quantile([0.25, 0.75])
+#st.markdown(f"- Médiane : **{med_age:.1f}** ans")
+#st.markdown(f"- 1er quartile : **{q1:.1f}** ans")
+#st.markdown(f"- 3e quartile : **{q3:.1f}** ans")
 
 # Boxplot de l'âge
-fig, ax = plt.subplots()
-sns.boxplot(x=rrhmbn_valide["age"], ax=ax, color="skyblue")
-ax.set_title("Répartition de l'âge")
-st.pyplot(fig)
+#fig, ax = plt.subplots()
+#sns.boxplot(x=rrhmbn_valide["age"], ax=ax, color="skyblue")
+#ax.set_title("Répartition de l'âge")
+#st.pyplot(fig)
 
 # 4. Sex ratio
-st.subheader("🚻 Répartition par sexe")
-nb_h = (rrhmbn_valide["sex"] == 1).sum()
-nb_f = (rrhmbn_valide["sex"] == 2).sum()
-sex_ratio = nb_h / nb_f if nb_f > 0 else None
-st.markdown(f"- Hommes : **{nb_h}**")
-st.markdown(f"- Femmes : **{nb_f}**")
-st.markdown(f"- Sex ratio (H/F) : **{sex_ratio:.2f}**" if sex_ratio else "- Sex ratio : Non calculable")
+#st.subheader("🚻 Répartition par sexe")
+#nb_h = (rrhmbn_valide["sex"] == 1).sum()
+#nb_f = (rrhmbn_valide["sex"] == 2).sum()
+#sex_ratio = nb_h / nb_f if nb_f > 0 else None
+#st.markdown(f"- Hommes : **{nb_h}**")
+#st.markdown(f"- Femmes : **{nb_f}**")
+#st.markdown(f"- Sex ratio (H/F) : **{sex_ratio:.2f}**" if sex_ratio else "- Sex ratio : Non calculable")
 
 # Pie chart
-sex_counts = rrhmbn_valide["sex"].map({1: "Homme", 2: "Femme"}).value_counts()
-fig, ax = plt.subplots()
-ax.pie(sex_counts, labels=sex_counts.index, autopct="%1.1f%%", startangle=90, colors=["lightblue", "lightcoral"])
-ax.axis("equal")
-st.pyplot(fig)
+#sex_counts = rrhmbn_valide["sex"].map({1: "Homme", 2: "Femme"}).value_counts()
+#fig, ax = plt.subplots()
+#ax.pie(sex_counts, labels=sex_counts.index, autopct="%1.1f%%", startangle=90, colors=["lightblue", "lightcoral"])
+#ax.axis("equal")
+#st.pyplot(fig)
 
 # 5. Incidence par année
 st.subheader("📅 Incidence par année")
