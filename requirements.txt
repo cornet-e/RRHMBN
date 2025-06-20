@@ -4,3 +4,5 @@ numpy
 plotly.express
 lifelines
 openpyxl
+seaborn
+matplotlib
