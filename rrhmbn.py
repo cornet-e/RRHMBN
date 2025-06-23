@@ -354,128 +354,190 @@ if 'hm' in locals() and not hm.empty:
 
     #### INCIDENCE ####
 
-    ### 1. Charger les données de population ###
-    df_pop = pd.read_excel("populations.XLSX", sheet_name="Feuil1")
-
-    # Colonnes à fondre : toutes sauf les 4 premières
-    colonnes_tranches = df_pop.columns[4:]
-
-    # Transformation en format long
-    df_pop_long = df_pop.melt(
-        id_vars=["Année", "Zone", "Sexe"],
-        value_vars=colonnes_tranches,
-        var_name="age_tranche",
-        value_name="population"
-    )
-
-    # Optionnel : supprimer les éventuelles lignes vides
-    df_pop_long = df_pop_long.dropna(subset=["population"])
-
-    # Ne garder que les lignes avec un sexe explicite
-    df_pop_long = df_pop_long[df_pop_long["Sexe"].isin(["Hommes", "Femmes"])]
-
-    # Normaliser les noms
-    df_pop_long["Sexe"] = df_pop_long["Sexe"].replace({
-        "Hommes": "Homme",
-        "Femmes": "Femme"
-    })
-
-    # Vérification
-    # st.dataframe(df_pop_long)
-    
-    # --- Créer les tranches d’âge pour les cas ---
+    ### --- 1. Chargement et préparation des données ---
+    # === Cas ===
     df_cas = hm.copy()
 
-    def get_age_tranche(age):
-        tranche = (age // 5) * 5
-        if tranche >= 85:
-            return "85+"
-        return f"{tranche}-{tranche+4}"
+    # Harmonisation du sexe
+    df_cas["sexe"] = df_cas["sex"].map({1: "Homme", 2: "Femme"})
 
-    df_cas["age_tranche"] = df_cas["age"].apply(get_age_tranche)
-
-    # Extraction du code départemental (2 premiers chiffres)
+    # Attribution du département à partir du code INSEE
+    df_cas["Code_INSEE_AuDiag"] = df_cas["Code_INSEE_AuDiag"].astype(str)
     df_cas["code_dep"] = df_cas["Code_INSEE_AuDiag"].str[:2]
-
-    # Attribution du nom de département
     df_cas["departement"] = df_cas["code_dep"].map({
         "14": "Calvados",
         "50": "Manche",
         "61": "Orne"
     })
+    df_cas = df_cas[df_cas["departement"].notna()]
 
-    # Remplacer les valeurs 1 et 2 par des chaînes
-    df_cas["sexe"] = df_cas["sex"].map({
-        1: "Homme",
-        2: "Femme"
-    })
+    # Ajout des tranches d'âge
+    def get_age_tranche(age):
+        if pd.isna(age):
+            return np.nan
+        tranche = int(age // 5 * 5)
+        return "95+" if tranche >= 95 else f"{tranche}-{tranche+4}"
 
-    # Ajouter colonne de comptage
+    df_cas["age_tranche"] = df_cas["age"].apply(get_age_tranche)
+
+    # === Population ===
+    df_pop = pd.read_excel("populations.XLSX")  # colonnes : annee, zone, sexe, 0-4, 5-9, ..., 85+
+    # Supprimer la première colonne (par position)
+    df_pop = df_pop.iloc[:, 1:]
+
+    st.dataframe(df_pop)
+
+    # Ne garder que les sexes homme/femme
+    df_pop = df_pop[df_pop["Sexe"].isin(["Hommes", "Femmes"])]
+    df_pop["Sexe"] = df_pop["Sexe"].replace({"Hommes": "Homme", "Femmes": "Femme"})
+
+    # 1. Renommer les colonnes clés
+    df_pop.rename(columns={
+        'Année': 'annee',
+        'Zone': 'zone',
+        'Sexe': 'sexe'
+    }, inplace=True)
+
+    # 2. Supprimer les colonnes inutiles
+    df_pop.drop(columns=['Total', 'Unnamed: 25'], errors='ignore', inplace=True)
+
+    # 3. Nettoyer les noms de colonnes d'âges : enlever " ans", remplacer espaces par '_', etc.
+    def clean_age_label(col):
+        col = col.strip()  # enlève espaces en début/fin
+        if 'ans et plus' in col:
+            # ex : "95 ans et plus" -> "95+"
+            return col.split(' ')[0] + '+'
+        else:
+            # ex : "50 - 54 ans" -> "50-54"
+            parts = col.split(' ')
+            # on prend le 1er et 3e élément (ex: ["50", "-", "54", "ans"])
+            if len(parts) >= 3:
+                return parts[0] + '-' + parts[2]
+            else:
+                return col  # au cas où le format diffère
+
+
+    age_cols = [col for col in df_pop.columns if col not in ['annee', 'zone', 'sexe']]
+    new_age_cols = [clean_age_label(c) for c in age_cols]
+
+    rename_dict = dict(zip(age_cols, new_age_cols))
+    df_pop.rename(columns=rename_dict, inplace=True)
+
+    st.write("Colonnes du DataFrame population :")
+    st.write(df_pop.columns)
+
+    # Restructurer en format long
+    colonnes_fixes = ['annee', 'zone', 'sexe']
+    colonnes_ages = [col for col in df_pop.columns if col not in colonnes_fixes]
+
+    df_pop_long = df_pop.melt(
+        id_vars=colonnes_fixes,
+        value_vars=colonnes_ages,
+        var_name="age_tranche",
+        value_name="population"
+    ).dropna(subset=["population"])
+
+    st.dataframe(df_pop_long)
+
+    ### --- 2. Agrégation des cas par groupe ---
+
     df_cas["n"] = 1
+    df_cas_grouped = df_cas.groupby(["annee_diag", "departement", "sexe", "age_tranche"], as_index=False)["n"].sum()
 
-    # Regrouper les cas
-    df_cas_grouped = df_cas.groupby(["annee_diag", "departement", "sex", "age_tranche"])["n"].sum().reset_index()
+    st.dataframe(df_cas)
+    st.dataframe(df_cas_grouped)
 
-    # Zones de travail (Calvados, Orne, Manche)
+    ### --- 3. Préparation des populations de référence ---
+
+    ref_europe = df_pop_long[df_pop_long["zone"].str.startswith("Europe")]
+    ref_monde = df_pop_long[df_pop_long["zone"].str.startswith("Monde")]
+
+    ### --- 4. Calculs des taux ---
+
     departements = ["Calvados", "Orne", "Manche"]
     sexes = ["Homme", "Femme"]
+    annees = sorted(df_cas["annee_diag"].unique())
 
-    # Standardisation : récupère les populations de référence (Europe et Monde)
-    ref_europe = df_pop_long[df_pop_long["Zone"].str.startswith("Europe")]
-    ref_monde = df_pop_long[df_pop_long["Zone"].str.startswith("Monde")]
-
-    # Créer un tableau final
     resultats = []
 
     for dep in departements:
         for sexe in sexes:
-            for annee in range(1997, 2023):
-                # Cas de la zone
-                cas_dep = df_cas_grouped[
+            for annee in annees:
+                # Cas par tranche
+                cas = df_cas_grouped[
                     (df_cas_grouped["departement"] == dep) &
-                    (df_cas_grouped["sex"] == sexe) &
+                    (df_cas_grouped["sexe"] == sexe) &
                     (df_cas_grouped["annee_diag"] == annee)
                 ]
-                
-                # Pop réelle
+
+                # Pop locale
                 pop_zone = df_pop_long[
-                    (df_pop_long["Zone"] == dep) &
-                    (df_pop_long["Sexe"] == sexe) &
-                    (df_pop_long["Année"] == annee)
+                    (df_pop_long["zone"] == dep) &
+                    (df_pop_long["sexe"] == sexe) &
+                    (df_pop_long["annee"] == annee)
                 ]
 
-                # Fusion cas/population
-                df_merge = pd.merge(cas_dep, pop_zone, on=["age_tranche"], how="right").fillna(0)
-                
-                # Taux brut
-                total_cas = df_merge["n"].sum()
-                total_pop = df_merge["population"].sum()
+                # Fusion
+                df = pd.merge(pop_zone, cas, on="age_tranche", how="left").fillna({"n": 0})
+
+                # Forcer les types numériques
+                df["population"] = pd.to_numeric(df["population"], errors="coerce")
+                df["n"] = pd.to_numeric(df["n"], errors="coerce").fillna(0)
+
+                # Calculs
+                total_cas = df["n"].sum()
+                total_pop = df["population"].sum()
                 taux_brut = (total_cas / total_pop) * 100000 if total_pop > 0 else np.nan
 
                 # Taux standardisé Europe
-                pop_eu = ref_europe[(ref_europe["Année"] == annee) & (ref_europe["Sexe"] == sexe)]
-                df_se = pd.merge(df_merge, pop_eu, on="age_tranche", suffixes=('', '_ref')).fillna(0)
-                numerateur_se = (df_se["n"] / df_se["population"]) * df_se["population_ref"]
-                taux_se = numerateur_se.sum() / df_se["population_ref"].sum() * 100000
+                ref_eu = ref_europe[
+                    (ref_europe["sexe"] == sexe) &
+                    (ref_europe["annee"] == annee)
+                ][["age_tranche", "population"]].rename(columns={"population": "pop_ref"})
+                df_eu = pd.merge(df, ref_eu, on="age_tranche", how="inner")
+                
+                df_eu["population"] = pd.to_numeric(df_eu["population"], errors="coerce")
+                df_eu["n"] = pd.to_numeric(df_eu["n"], errors="coerce").fillna(0)
+                df_eu["pop_ref"] = pd.to_numeric(df_eu["pop_ref"], errors="coerce")
+
+                # Supprimer les lignes avec pop_ref manquante ou 0
+                df_eu = df_eu[df_eu["pop_ref"].notna() & (df_eu["pop_ref"] > 0)]
+                                
+                taux_std_eu = ((df_eu["n"] / df_eu["population"]) * df_eu["pop_ref"]).sum() / df_eu["pop_ref"].sum() * 100000
 
                 # Taux standardisé Monde
-                pop_world = ref_monde[(ref_monde["Année"] == annee) & (ref_monde["Sexe"] == sexe)]
-                df_sm = pd.merge(df_merge, pop_world, on="age_tranche", suffixes=('', '_ref')).fillna(0)
-                numerateur_sm = (df_sm["n"] / df_sm["population"]) * df_sm["population_ref"]
-                taux_sm = numerateur_sm.sum() / df_sm["population_ref"].sum() * 100000
+                ref_mo = ref_monde[
+                    (ref_monde["sexe"] == sexe) &
+                    (ref_monde["annee"] == annee)
+                ][["age_tranche", "population"]].rename(columns={"population": "pop_ref"})
+                df_mo = pd.merge(df, ref_mo, on="age_tranche", how="inner")
 
-                # Sauvegarder
+                df_mo["population"] = pd.to_numeric(df_mo["population"], errors="coerce")
+                df_mo["n"] = pd.to_numeric(df_mo["n"], errors="coerce").fillna(0)
+                df_mo["pop_ref"] = pd.to_numeric(df_mo["pop_ref"], errors="coerce")
+
+                # Supprimer les lignes avec pop_ref manquante ou 0
+                df_mo = df_mo[df_mo["pop_ref"].notna() & (df_mo["pop_ref"] > 0)]
+
+                taux_std_mo = ((df_mo["n"] / df_mo["population"]) * df_mo["pop_ref"]).sum() / df_mo["pop_ref"].sum() * 100000
+
+                # Sauvegarde
                 resultats.append({
-                    "annee": annee,
+                    "Année": annee,
                     "departement": dep,
                     "sexe": sexe,
-                    "taux_brut": taux_brut,
-                    "taux_standardise_europe": taux_se,
-                    "taux_standardise_monde": taux_sm
+                    "taux_brut": round(taux_brut, 2),
+                    "taux_std_europe": round(taux_std_eu, 2),
+                    "taux_std_monde": round(taux_std_mo, 2)
                 })
 
-    # Résultat final
+    ### --- 5. Export final ---
+
     df_resultats = pd.DataFrame(resultats)
+    #df_resultats.to_csv("taux_incidence_resultats.csv", index=False)
+
+    print("✅ Calcul terminé. Résultats exportés dans taux_incidence_resultats.csv")
+
 
     st.dataframe(df_resultats)
 
