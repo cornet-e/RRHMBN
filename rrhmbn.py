@@ -266,6 +266,94 @@ if 'hm' in locals() and not hm.empty:
             pickle.dump(hm_libelle, f)
         st.success("Objets sauvegardés avec succès (hm.pkl et hm_libelle.pkl)")
     
+
+    st.title("Statistiques descriptives")
+
+    ### Tableau des effectifs ###
+    st.success(f"Analyse de : **{hm_libelle}** ({len(hm)} cas)")
+
+    # Colonnes utiles
+    hm["Calvados"] = hm["Code_INSEE_AuDiag"].str.startswith("14").astype(int)
+    hm["Orne"] = hm["Code_INSEE_AuDiag"].str.startswith("61").astype(int)
+    hm["Manche"] = hm["Code_INSEE_AuDiag"].str.startswith("50").astype(int)
+
+    # Regrouper par année
+    tableau = hm.groupby("annee_diag").agg(
+        nb_hommes=("sex", lambda x: (x == 1).sum()),
+        nb_femmes=("sex", lambda x: (x == 2).sum()),
+        cas_calvados=("Calvados", "sum"),
+        cas_orne=("Orne", "sum"),
+        cas_manche=("Manche", "sum"),
+    )
+
+    # Ajouter total ligne
+    tableau["total"] = tableau.sum(axis=1)
+
+    # Calcul du % que représente chaque année sur le total global
+    total_global = tableau["total"].sum()
+    tableau["total (%)"] = (tableau["total"] / total_global * 100).round(1)
+
+    # Fusionner uniquement cette colonne corrigée avec le tableau existant
+    #tableau_final.update(tableau["total (%)"])
+
+    st.subheader("📊 Tableau double entrée par année de diagnostic")
+    st.dataframe(tableau)
+
+    ### Pyramide des âges ####
+    st.success(f"Analyse de : **{hm_libelle}** ({len(hm)} cas)")
+
+    # Définir les classes d'âge
+    bornes = list(range(0, 100, 5)) + [120]
+    labels = [f"{i:02d}-{i+4:02d}" for i in range(0, 95, 5)] + ["95+"]
+
+    # Créer les classes d'âge
+    hm["classe_age"] = pd.cut(hm["age"], bins=bornes, labels=labels, right=False)
+
+    # Compter les effectifs par classe d'âge et sexe
+    pyramide = hm.groupby(["classe_age", "sex"]).size().unstack(fill_value=0)
+
+    # Mettre les hommes en négatif
+    pyramide[1] = -pyramide.get(1, 0)  # Hommes
+    pyramide[2] = pyramide.get(2, 0)   # Femmes
+
+    # Tracer la pyramide
+    fig, ax = plt.subplots(figsize=(8, 6))
+    pyramide[[1, 2]].plot(kind='barh', ax=ax, color=["skyblue", "lightcoral"])
+    ax.set_yticklabels(pyramide.index)
+    ax.set_xlabel("Effectifs")
+    ax.set_title("Pyramide des âges au diagnostic")
+    ax.legend(["Hommes", "Femmes"])
+    ax.axvline(0, color='black', linewidth=0.8)
+    plt.tight_layout()
+
+    # Affichage dans Streamlit
+    st.subheader("📊 Pyramide des âges au diagnostic")
+    st.pyplot(fig)
+
+    ### Statistiques descriptives ###
+    # Fonction de résumé statistique
+    def stats_age_par_sexe(df, age_col="age", sexe_col="sex"):
+        stats = df.groupby(sexe_col)[age_col].agg(
+            N="count",
+            Moyenne="mean",
+            Médiane="median",
+            Q1=lambda x: x.quantile(0.25),
+            Q3=lambda x: x.quantile(0.75),
+            Min="min",
+            Max="max"
+        ).round(1)
+        
+        # Mapping des sexes si codés 1 = Homme, 2 = Femme
+        stats.index = stats.index.map({1: "Hommes", 2: "Femmes"})
+        return stats.reset_index()
+
+    # Appliquer la fonction au sous-ensemble sélectionné
+    st.subheader("📈 Statistiques descriptives de l'âge au diagnostic")
+    stats_age = stats_age_par_sexe(hm)
+    st.dataframe(stats_age)
+
+    
+
     st.title("📈 Analyse de survie par sexe (Kaplan-Meier)")
 
 # Charger les objets sauvegardés
