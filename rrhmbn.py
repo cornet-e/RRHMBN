@@ -538,7 +538,7 @@ if 'hm' in locals() and not hm.empty:
 
     #print("✅ Calcul terminé. Résultats exportés dans taux_incidence_resultats.csv")
 
-
+    st.subheader("📈 Taux d'incidence (pour 100 000 habitants)")
     st.dataframe(df_resultats)
 
 
@@ -644,7 +644,7 @@ for sex in groups:
 # Affichage
 fig.update_layout(
     title=f"{hm_libelle} - Survie selon le sexe<br><sup>Test de log-rank p = {p_value:.3e}</sup>",
-    xaxis_title="Temps (jours)",
+    xaxis_title="Temps (mois)",
     yaxis_title="Probabilité de survie",
     yaxis=dict(range=[0, 1]),
     annotations=annotations,
