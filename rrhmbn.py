@@ -385,7 +385,7 @@ if 'hm' in locals() and not hm.empty:
     # Supprimer la première colonne (par position)
     df_pop = df_pop.iloc[:, 1:]
 
-    st.dataframe(df_pop)
+    #st.dataframe(df_pop)
 
     # Ne garder que les sexes homme/femme
     df_pop = df_pop[df_pop["Sexe"].isin(["Hommes", "Femmes"])]
@@ -423,8 +423,8 @@ if 'hm' in locals() and not hm.empty:
     rename_dict = dict(zip(age_cols, new_age_cols))
     df_pop.rename(columns=rename_dict, inplace=True)
 
-    st.write("Colonnes du DataFrame population :")
-    st.write(df_pop.columns)
+    #st.write("Colonnes du DataFrame population :")
+    #st.write(df_pop.columns)
 
     # Restructurer en format long
     colonnes_fixes = ['annee', 'zone', 'sexe']
@@ -437,15 +437,15 @@ if 'hm' in locals() and not hm.empty:
         value_name="population"
     ).dropna(subset=["population"])
 
-    st.dataframe(df_pop_long)
+    #st.dataframe(df_pop_long)
 
     ### --- 2. Agrégation des cas par groupe ---
 
     df_cas["n"] = 1
     df_cas_grouped = df_cas.groupby(["annee_diag", "departement", "sexe", "age_tranche"], as_index=False)["n"].sum()
 
-    st.dataframe(df_cas)
-    st.dataframe(df_cas_grouped)
+    #st.dataframe(df_cas)
+    #st.dataframe(df_cas_grouped)
 
     ### --- 3. Préparation des populations de référence ---
 
@@ -536,7 +536,7 @@ if 'hm' in locals() and not hm.empty:
     df_resultats = pd.DataFrame(resultats)
     #df_resultats.to_csv("taux_incidence_resultats.csv", index=False)
 
-    print("✅ Calcul terminé. Résultats exportés dans taux_incidence_resultats.csv")
+    #print("✅ Calcul terminé. Résultats exportés dans taux_incidence_resultats.csv")
 
 
     st.dataframe(df_resultats)
