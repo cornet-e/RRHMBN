@@ -352,7 +352,112 @@ if 'hm' in locals() and not hm.empty:
     stats_age = stats_age_par_sexe(hm)
     st.dataframe(stats_age)
 
+    #### INCIDENCE ####
+
+    ### 1. Charger les données de population ###
+    df_pop = pd.read_excel("populations.XLSX", sheet_name="Feuil1")
+
+    # Colonnes d'âge
+    age_cols = [col for col in df_pop.columns if "ans" in col and "Total" not in col]
+
+    # Dernière année disponible
+    annee_max = df_pop["Année"].max()
+    df_pop_filtered = df_pop[df_pop["Année"] == annee_max]
+
+    # Zones à considérer
+    zones_utiles = ["Calvados", "Manche", "Orne"]
+
+    # Filtrer les zones utiles
+    df_zones = df_pop_filtered[df_pop_filtered["Zone"].isin(zones_utiles)]
+
+    # Population totale par zone et sexe
+    pop_totaux = (
+    df_zones.groupby(["Zone", "Sexe"])[age_cols]
+    .sum()
+    )
+
+    pop_totaux["population_totale"] = pop_totaux.sum(axis=1)
+    pop_totaux = pop_totaux.reset_index()[["Zone", "Sexe", "population_totale"]]
+
+    # Ajouter les "Toutes zones"
+    # pop_totaux : colonnes Zone, Sexe, population_totale
+    pop_totaux = pop_totaux.rename(columns={"Zone": "zone", "Sexe": "sex"})
+
+    # pop_toutes_zones : on renomme aussi les colonnes de la même façon
+    pop_toutes_zones = (
+        pop_totaux.groupby("sex")["population_totale"]
+        .sum()
+        .reset_index()
+        .assign(zone="Toutes zones")
+    )
+
+    # Concaténer
+    pop_totaux = pd.concat([pop_totaux, pop_toutes_zones], ignore_index=True)
+
+
+    #st.dataframe(pop_totaux)
+
+    # Générer le dictionnaire des populations
+    population_zone_sexe = {
+        (row["zone"], row["sex"]): row["population_totale"]
+        for _, row in pop_totaux.iterrows()
+    }
+
+    ### 2. Extraire la structure de population "Monde" ###
+    df_monde = df_pop_filtered[df_pop_filtered["Zone"] == "Monde"]
+    pop_std = df_monde.groupby("Sexe")[age_cols].mean()
+
+  
+    ### 3. Ajouter zones + "Toutes zones" à hm###
+    df_cas = hm.copy()
+
+    # Ajouter la colonne 'zone' en fonction du préfixe du code INSEE
+    def code_insee_to_zone(code):
+        if str(code).startswith("14"):
+            return "Calvados"
+        elif str(code).startswith("61"):
+            return "Orne"
+        elif str(code).startswith("50"):
+            return "Manche"
+        else:
+            return "Autre"
+
+    df_cas["zone"] = df_cas["Code_INSEE_AuDiag"].apply(code_insee_to_zone)
+
+    #st.dataframe(df_cas)
     
+    ### 5. Calcul du taux brut ###
+    cas_groupes = df_cas.groupby(["patho_sous_type_XT_label", "sex", "zone"]).size().reset_index(name="nb_cas")
+    cas_groupes["population"] = cas_groupes.apply(
+        lambda row: population_zone_sexe.get((row["zone"], row["sex"]), np.nan), axis=1
+    )
+    cas_groupes["taux_brut"] = (cas_groupes["nb_cas"] / cas_groupes["population"]) * 100_000
+
+    ### 6. Calcul du taux standardisé (Monde) ###
+    # Créer tranche d'âge compatible avec les colonnes d'âge
+    def age_to_tranche(age):
+        if age >= 95:
+            return "95 ans et plus"
+        tranche = f"{age // 5 * 5} - {age // 5 * 5 + 4} ans"
+        return tranche
+
+    df_cas["tranche_age"] = df_cas["age"].apply(age_to_tranche)
+
+    # Nombre de cas par tranche
+    cas_par_tranche = df_cas.groupby(["patho_sous_type_XT_label", "sex", "zone", "tranche_age"]).size().reset_index(name="nb_cas")
+
+    
+    ### 7. Résultat final ###
+    df_final = cas_groupes
+
+    st.dataframe(df_final)
+
+
+
+
+
+
+
 
     st.title("📈 Analyse de survie par sexe (Kaplan-Meier)")
 
