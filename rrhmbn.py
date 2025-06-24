@@ -860,6 +860,103 @@ if 'hm' in locals() and not hm.empty:
 #    st.error("Fichiers `hm.pkl` ou `hm_libelle.pkl` introuvables.")
 #    st.stop()
 
+
+#### SURVIE POPULATION GENERALE ####
+
+def courbe_survie_patient_age_depart(age_depart, sexe, annee, df_insee):
+    # Sélection du sexe
+    if sexe == 1:
+        df = df_insee["hommes"]
+    elif sexe == 2:
+        df = df_insee["femmes"]
+    else:
+        return None
+
+    # Nettoyage années
+    df = df[pd.to_numeric(df["Année"], errors="coerce").notna()]
+    df["Année"] = df["Année"].astype(int)
+    annee_dispo = df["Année"].unique()
+    annee_closest = min(annee_dispo, key=lambda x: abs(x - annee))
+
+    ligne = df[df["Année"] == annee_closest]
+    if ligne.empty:
+        return None
+    ligne = ligne.iloc[0]
+
+    age_groups = [col for col in df.columns if col != "Année"]
+
+    # Trouver l'indice du groupe d'âge contenant age_depart
+    # Les groupes d'âge ont des labels comme "30 à 34 ans", on va extraire min âge
+    def min_age_from_label(label):
+        if label == "<1":
+            return 0
+        else:
+            # Exemple : "30 à 34 ans" -> 30
+            parts = label.split(" à ")
+            try:
+                return int(parts[0])
+            except:
+                return None
+
+    min_ages = [min_age_from_label(grp) for grp in age_groups]
+
+    # Trouver l'indice de départ
+    start_idx = None
+    for i, min_a in enumerate(min_ages):
+        if min_a is not None and min_a >= age_depart:
+            start_idx = i
+            break
+    if start_idx is None:
+        return None  # âge de départ trop élevé
+
+    courbe = []
+    survivants = 1.0
+    # Calcul survie cumulative à partir de start_idx
+    for i in range(start_idx, len(age_groups)):
+        grp = age_groups[i]
+        taux = ligne[grp] / 1000  # taux de décès
+        courbe.append((i - start_idx, survivants))  # temps = nombre de tranches depuis âge départ
+        survivants *= (1 - taux)
+
+    df_courbe = pd.DataFrame(courbe, columns=["temps", "survie_theorique"])
+    # ajouter info âge départ en colonne pour traçage
+    df_courbe["age_depart"] = age_depart
+    return df_courbe
+
+def courbe_survie_moyenne_age_depart(hm, df_insee_dict, ages_depart):
+    survivances_par_age = {age: {} for age in ages_depart}
+    
+    for _, row in hm.iterrows():
+        age_pat = row["age"]
+        sexe_pat = row["sex"]
+        annee_diag = row["annee_diag"]
+
+        for age_dep in ages_depart:
+            # On ne calcule la courbe que si l'âge du patient est >= âge de départ (logique)
+            if age_pat >= age_dep:
+                courbe = courbe_survie_patient_age_depart(age_dep, sexe_pat, annee_diag, df_insee_dict)
+                if courbe is not None:
+                    for _, ligne in courbe.iterrows():
+                        temps = ligne["temps"]
+                        surv = ligne["survie_theorique"]
+                        survivances_par_age[age_dep].setdefault(temps, []).append(surv)
+
+    # Calcul moyenne par âge de départ et par temps
+    result = []
+    for age_dep, data in survivances_par_age.items():
+        for temps, valeurs in data.items():
+            result.append({
+                "age_depart": age_dep,
+                "temps": temps,
+                "S_theorique_moyenne": np.mean(valeurs)
+            })
+
+    df_result = pd.DataFrame(result)
+    return df_result
+
+##### FIN DES DEF POUR SURVIE POP GENERALE #####
+
+
 # Vérification des colonnes
 for col in ['fup', 'event', 'sex']:
     if col not in hm.columns:
@@ -954,6 +1051,78 @@ fig.update_layout(
 )
 
 st.plotly_chart(fig, use_container_width=True)
+
+### tracé courbe survie pop générale
+df_insee = {
+    "hommes": pd.read_excel("fm_t67_clean.xlsx", sheet_name="T67h"),
+    "femmes": pd.read_excel("fm_t67_clean.xlsx", sheet_name="T67f")
+}
+
+ages_depart = [30, 50, 70, 90]
+
+# Assure-toi que ton dataframe hm contient au moins 'age', 'sex', 'annee_diag'
+# Exemple d'appel :
+df_survie_moyenne = courbe_survie_moyenne_age_depart(hm, df_insee, ages_depart)
+
+# Tracé
+fig = go.Figure()
+
+colors = {30: "green", 50: "orange", 70: "red", 90: "purple"}
+
+for age_dep in ages_depart:
+    df_sub = df_survie_moyenne[df_survie_moyenne["age_depart"] == age_dep]
+    fig.add_trace(go.Scatter(
+        x=df_sub["temps"] * 5 * 12,  # conversion tranches en mois (5 ans * 12 mois)
+        y=df_sub["S_theorique_moyenne"],
+        mode="lines+markers",
+        name=f"Survie théorique dès {age_dep} ans",
+        line=dict(color=colors.get(age_dep, "gray"), dash="dot")
+    ))
+
+# Ici tu peux ajouter ta courbe Kaplan-Meier si tu veux, par ex :
+# Courbes de survie
+for sex in groups:
+    subset = df[df['sex'] == sex]
+    kmf.fit(subset['fup'], subset['event'], label=f"Sexe {sex}")
+    medians[sex] = kmf.median_survival_time_
+    rmeans[sex] = kmf.conditional_time_to_event_.mean()
+    
+    fig.add_trace(go.Scatter(
+        x=kmf.survival_function_.index,
+        y=kmf.survival_function_[f"Sexe {sex}"],
+        mode='lines',
+        name=f"Sexe {sex}",
+        line=dict(color=colors.get(sex, 'gray')),
+    ))
+
+    # IC (bande)
+    fig.add_trace(go.Scatter(
+        x=kmf.confidence_interval_.index,
+        y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
+        mode='lines',
+        line=dict(width=0),
+        showlegend=False
+    ))
+    fig.add_trace(go.Scatter(
+        x=kmf.confidence_interval_.index,
+        y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
+        fill='tonexty',
+        fillcolor='rgba(0,0,0,0.1)',
+        mode='lines',
+        line=dict(width=0),
+        name=f"IC 95% {sex}"
+    ))
+
+fig.update_layout(
+    title=f"{hm_libelle} - Survie selon le sexe<br><sup>Test de log-rank p = {p_value:.3e}</sup>",
+    xaxis_title="Temps (mois)",
+    yaxis_title="Probabilité de survie",
+    yaxis=dict(range=[0, 1]),
+    template="plotly_white"
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
 
 # Analyse Survie par sexe et groupe age
 
