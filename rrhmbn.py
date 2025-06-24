@@ -262,16 +262,23 @@ if 'rrhmbn_valide' in locals():
         choix = st.radio("Type de sélection :", ["Groupe Patho", "Sous-Type Patho"])
 
         if choix == "Groupe Patho":
-            groupes = rrhmbn_valide["patho_groupe"].dropna().unique()
-            groupe_id = st.selectbox("Sélectionnez un code de groupe patho :", sorted(groupes))
-            hm = rrhmbn_valide[rrhmbn_valide["patho_groupe"] == groupe_id]
-            hm_libelle = hm["patho_groupe_label"].iloc[0] if not hm.empty else None
+            # On sélectionne les libellés uniques
+            libelles = rrhmbn_valide["patho_groupe_label"].dropna().unique()
+            libelle_sel = st.selectbox("Sélectionnez un libellé de groupe patho :", sorted(libelles))
+
+            # On filtre selon le libellé
+            hm = rrhmbn_valide[rrhmbn_valide["patho_groupe_label"] == libelle_sel]
+            hm_libelle = libelle_sel if not hm.empty else None
 
         elif choix == "Sous-Type Patho":
-            sous_types = rrhmbn_valide["patho_sous_type"].dropna().unique()
-            sous_type_id = st.selectbox("Sélectionnez un code de sous-type patho :", sorted(sous_types))
-            hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type"] == sous_type_id]
-            hm_libelle = hm["patho_sous_type_label"].iloc[0] if not hm.empty else None
+            # Liste des libellés uniques de sous-types
+            sous_type_labels = rrhmbn_valide["patho_sous_type_label"].dropna().unique()
+            sous_type_label_sel = st.selectbox("Sélectionnez un libellé de sous-type patho :", sorted(sous_type_labels))
+
+            # Filtrer les cas selon le libellé
+            hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_label"] == sous_type_label_sel]
+            hm_libelle = sous_type_label_sel if not hm.empty else None
+
 
     elif choix0 == "XT":
         xt_labels = rrhmbn_valide["patho_sous_type_XT_label"].dropna().unique()
