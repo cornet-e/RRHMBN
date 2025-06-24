@@ -12,6 +12,7 @@ import plotly.graph_objs as go
 import plotly.subplots as sp
 import matplotlib.pyplot as plt
 import seaborn as sns
+import plotly.express as px
 
 
 st.set_page_config(page_title="RRHMBN - Import des données", layout="wide")
@@ -75,6 +76,9 @@ if file is not None:
         df_filtre["DateDuDiag"] = pd.to_datetime(df_filtre["DateDuDiag"], errors="coerce")
         df_filtre["DateDernieresNouvelles"] = pd.to_datetime(df_filtre["DateDernieresNouvelles"], errors="coerce")
 
+        # Créer la colonne "annee_diag"
+        df_filtre["annee_diag"] = df_filtre["DateDuDiag"].dt.year.astype("Int64")
+
         # Calcul de la durée de suivi en mois
         df_filtre["Follow_up_months"] = (
             (df_filtre["DateDernieresNouvelles"] - df_filtre["DateDuDiag"]).dt.days / 30.44
@@ -87,11 +91,13 @@ if file is not None:
         for col in colonnes_a_verifier:
             df_filtre[col] = df_filtre[col].astype(str).str.upper().str.strip()
 
-        # Créer la colonne Cas_valides : 1 si toutes les 3 colonnes sont "FALSE", sinon 0
+        # Créer la colonne Cas_valides : 1 si toutes les 3 colonnes sont "FALSE", sinon 0 / pour année 1997 min et 2022 max
         df_filtre["Cas_valides"] = (
             (df_filtre["Exclusion"] == "FALSE") &
             (df_filtre["A_Surveiller"] == "FALSE") &
-            (df_filtre["Pre_Saisie"] == "FALSE")
+            (df_filtre["Pre_Saisie"] == "FALSE") &
+            (df_filtre["annee_diag"] <= 2022) &
+            (df_filtre["annee_diag"] >= 1997)
         ).astype(int)
 
         # Définir les bornes et les étiquettes personnalisées
@@ -111,8 +117,7 @@ if file is not None:
             right=False  # pour avoir des intervalles du type [x;y[
         )
 
-        # Créer la colonne "annee_diag"
-        df_filtre["annee_diag"] = df_filtre["DateDuDiag"].dt.year
+        
 
         # Charger le fichier ICDO
         df_icdo = pd.read_excel("ICDO.xlsx")
@@ -185,8 +190,22 @@ st.markdown(f"**Nombre total de cas valides :** {nb_total:,}".replace(",", " "
 
 # 2. Nombre de cas par pathologie
 st.subheader("🦠 Nombre de cas par pathologie (Top 10)")
+# Récupérer le top 10
 top_pathos = rrhmbn_valide["patho_sous_type_label"].value_counts().head(10)
-st.bar_chart(top_pathos)
+# Remettre sous forme de DataFrame, et trier pour affichage dans l'ordre décroissant
+df_top_pathos = top_pathos.reset_index()
+df_top_pathos.columns = ["Pathologie", "Nombre de cas"]
+df_top_pathos = df_top_pathos.sort_values("Nombre de cas", ascending=False)
+# st.bar_chart(top_pathos)
+
+fig = px.bar(df_top_pathos, x="Pathologie", y="Nombre de cas",
+             title="Top 10 des pathologies",
+             text="Nombre de cas",
+             color="Nombre de cas",
+             color_continuous_scale="Reds")
+
+fig.update_layout(xaxis={'categoryorder':'total descending'})
+st.plotly_chart(fig)
 
 # 3. Statistiques sur l'âge
 #st.subheader("🎂 Statistiques d'âge")
@@ -221,7 +240,14 @@ st.bar_chart(top_pathos)
 # 5. Incidence par année
 st.subheader("📅 Incidence par année")
 incid = rrhmbn_valide["annee_diag"].value_counts().sort_index()
-st.line_chart(incid)
+# Convertir l’index en chaîne (pas int !)
+df_incid = incid.reset_index()
+df_incid.columns = ["Année", "Nombre de cas"]
+df_incid["Année"] = df_incid["Année"].astype(str)  # <- Clé ici !
+
+# Affichage dans Streamlit
+st.line_chart(data=df_incid, x="Année", y="Nombre de cas")
+
 
 
 st.markdown("---")
@@ -296,7 +322,7 @@ if 'hm' in locals() and not hm.empty:
     # Fusionner uniquement cette colonne corrigée avec le tableau existant
     #tableau_final.update(tableau["total (%)"])
 
-    st.subheader("📊 Tableau double entrée par année de diagnostic")
+    st.subheader(f"📊 Tableau double entrée par année de diagnostic - {hm_libelle}")
     st.dataframe(tableau)
 
     ### Pyramide des âges ####
@@ -327,10 +353,12 @@ if 'hm' in locals() and not hm.empty:
     plt.tight_layout()
 
     # Affichage dans Streamlit
-    st.subheader("📊 Pyramide des âges au diagnostic")
+    st.subheader(f"📊 Pyramide des âges au diagnostic - {hm_libelle}")
     st.pyplot(fig)
 
+
     ### Statistiques descriptives ###
+    
     # Fonction de résumé statistique
     def stats_age_par_sexe(df, age_col="age", sexe_col="sex"):
         stats = df.groupby(sexe_col)[age_col].agg(
@@ -345,18 +373,32 @@ if 'hm' in locals() and not hm.empty:
         
         # Mapping des sexes si codés 1 = Homme, 2 = Femme
         stats.index = stats.index.map({1: "Hommes", 2: "Femmes"})
-        return stats.reset_index()
+        
+         # Calcul du sex-ratio (H/F)
+        nb_h = stats.loc["Hommes", "N"] if "Hommes" in stats.index else 0
+        nb_f = stats.loc["Femmes", "N"] if "Femmes" in stats.index else 0
+        sex_ratio = round(nb_h / nb_f, 2) if nb_f > 0 else np.nan
+        # Ajouter une ligne "Sex-ratio H/F"
+        stats.loc["Sex-ratio H/F"] = [sex_ratio, "", "", "", "", "", ""]
+        
+        return stats.reset_index(names="Sexe")
 
     # Appliquer la fonction au sous-ensemble sélectionné
-    st.subheader("📈 Statistiques descriptives de l'âge au diagnostic")
+    st.subheader(f"📈 Statistiques descriptives de l'âge au diagnostic - {hm_libelle}")
     stats_age = stats_age_par_sexe(hm)
     st.dataframe(stats_age)
 
     #### INCIDENCE ####
+    st.subheader(f"📈 Taux d'incidence (pour 100 000 habitants) - {hm_libelle}")
 
     ### --- 1. Chargement et préparation des données ---
     # === Cas ===
+    annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
     df_cas = hm.copy()
+    df_cas = df_cas[
+        (df_cas["annee_diag"] >= annees_min_max[0]) &
+        (df_cas["annee_diag"] <= annees_min_max[1])
+    ]
 
     # Harmonisation du sexe
     df_cas["sexe"] = df_cas["sex"].map({1: "Homme", 2: "Femme"})
@@ -538,13 +580,266 @@ if 'hm' in locals() and not hm.empty:
 
     #print("✅ Calcul terminé. Résultats exportés dans taux_incidence_resultats.csv")
 
-    st.subheader("📈 Taux d'incidence (pour 100 000 habitants)")
     st.dataframe(df_resultats)
 
 
+    ############# INCIDENCE PAR SEXE ET PERIODE #############
+    st.subheader(f"📊 Taux d'incidence (par sexe et période) - {hm_libelle}")
+
+    pas = st.slider("Durée des périodes (en années)", min_value=1, max_value=10, value=1, step=1) # Exemple : périodes de 5 ans (modifiable dynamiquement)
+    min_annee = df_cas["annee_diag"].min()
+    max_annee = df_cas["annee_diag"].max()
+
+    departements_disponibles = ["Calvados", "Orne", "Manche"]
+
+    departements_selectionnes = st.multiselect(
+        "Sélectionner les départements à inclure",
+        options=departements_disponibles,
+        default=departements_disponibles  # les 3 par défaut
+    )
+
+    df_cas = df_cas[df_cas["departement"].isin(departements_selectionnes)]
 
 
 
+    # Création d'une fonction pour assigner une période à une année
+    def get_periode(annee):
+        if pd.isna(annee):
+            return np.nan
+        debut = int((annee - min_annee) // pas * pas + min_annee)
+        fin = debut + pas - 1
+        return f"{debut}-{fin}"
+
+    df_cas["periode"] = df_cas["annee_diag"].apply(get_periode)
+    df_cas_grouped = df_cas.groupby(["periode", "sexe", "age_tranche"], as_index=False)["n"].sum()
+
+    df_pop_long["periode"] = df_pop_long["annee"].apply(get_periode)
+    df_pop_grouped = df_pop_long.groupby(["periode", "zone", "sexe", "age_tranche"], as_index=False)["population"].mean()
+
+    periodes = sorted(df_cas["periode"].dropna().unique())
+    sexes = ["Homme", "Femme"]
+    resultats_region = []
+
+    for sexe in sexes:
+        for periode in periodes:
+            cas = df_cas_grouped[
+                (df_cas_grouped["sexe"] == sexe) &
+                (df_cas_grouped["periode"] == periode)
+            ]
+
+            # Pop locale (somme des 3 départements)
+            pop_zone = df_pop_grouped[
+                (df_pop_grouped["zone"].isin(departements_selectionnes)) &
+                (df_pop_grouped["sexe"] == sexe) &
+                (df_pop_grouped["periode"] == periode)
+            ].groupby(["periode", "sexe", "age_tranche"], as_index=False)["population"].sum()
+
+            df = pd.merge(pop_zone, cas, on=["age_tranche"], how="left").fillna({"n": 0})
+
+            total_cas = df["n"].sum()
+            total_pop = df["population"].sum()
+            taux_brut = (total_cas / total_pop) * 100000 if total_pop > 0 else np.nan
+
+            # Référence Europe
+            ref_eu = df_pop_grouped[
+                (df_pop_grouped["zone"].str.startswith("Europe")) &
+                (df_pop_grouped["sexe"] == sexe) &
+                (df_pop_grouped["periode"] == periode)
+            ][["age_tranche", "population"]].rename(columns={"population": "pop_ref"})
+
+            df_eu = pd.merge(df, ref_eu, on="age_tranche", how="inner")
+            df_eu = df_eu[df_eu["pop_ref"].notna() & (df_eu["pop_ref"] > 0)]
+            taux_std_eu = ((df_eu["n"] / df_eu["population"]) * df_eu["pop_ref"]).sum() / df_eu["pop_ref"].sum() * 100000
+
+            # Référence Monde
+            ref_mo = df_pop_grouped[
+                (df_pop_grouped["zone"].str.startswith("Monde")) &
+                (df_pop_grouped["sexe"] == sexe) &
+                (df_pop_grouped["periode"] == periode)
+            ][["age_tranche", "population"]].rename(columns={"population": "pop_ref"})
+
+            df_mo = pd.merge(df, ref_mo, on="age_tranche", how="inner")
+            df_mo = df_mo[df_mo["pop_ref"].notna() & (df_mo["pop_ref"] > 0)]
+            taux_std_mo = ((df_mo["n"] / df_mo["population"]) * df_mo["pop_ref"]).sum() / df_mo["pop_ref"].sum() * 100000
+
+            resultats_region.append({
+                "Période": periode,
+                "sexe": sexe,
+                "taux_brut": round(taux_brut, 2),
+                "taux_std_europe": round(taux_std_eu, 2),
+                "taux_std_monde": round(taux_std_mo, 2)
+            })
+
+    df_resultats_region = pd.DataFrame(resultats_region)
+ 
+    st.dataframe(df_resultats_region)
+
+
+    ### Graphiques évolution taux incidence
+
+    # Créer le nom de la zone dynamiquement
+    zone_label = ", ".join(departements_selectionnes)
+
+    st.subheader(f"📉 Évolution du taux brut d’incidence - {hm_libelle}")
+
+    #fig, ax = plt.subplots(figsize=(10, 5))
+    #sns.lineplot(
+    #    data=df_resultats_region,
+    #    x="Période", y="taux_brut", hue="sexe", marker="o", ax=ax
+    #)
+    #ax.set_title("Taux brut d’incidence par période (3 départements réunis)", fontsize=14)
+    #ax.set_ylabel("Taux pour 100 000 hab.")
+    #ax.set_xlabel("Période")
+    #ax.grid(True)
+    #plt.xticks(rotation=45)
+    #st.pyplot(fig)
+
+    ##fig plotly
+    fig = px.line(
+        df_resultats_region,
+        x="Période", y="taux_brut",
+        color="sexe", markers=True,
+        title=f"Taux brut ({zone_label})",
+        labels={"taux_brut": "Taux / 100 000 hab."}
+    )
+    fig.update_layout(title_font_size=16)
+    st.plotly_chart(fig)
+
+
+    ## Taux Std Europe
+    st.subheader(f"🌍 Évolution du taux standardisé Europe - {hm_libelle}")
+
+    #fig, ax = plt.subplots(figsize=(10, 5))
+    #sns.lineplot(
+    #    data=df_resultats_region,
+    #    x="Période", y="taux_std_europe", hue="sexe", marker="o", ax=ax
+    #)
+    #ax.set_title("Taux standardisé Europe par période (3 départements réunis)", fontsize=14)
+    #ax.set_ylabel("Taux pour 100 000 hab.")
+    #ax.set_xlabel("Période")
+    #ax.grid(True)
+    #plt.xticks(rotation=45)
+    #st.pyplot(fig)
+
+    ##Fig plotly
+    fig = px.line(
+        df_resultats_region,
+        x="Période", y="taux_std_europe",
+        color="sexe", markers=True,
+        title=f"Taux standardisé Europe ({zone_label})",
+        labels={"taux_std_europe": "Taux / 100 000 hab."}
+    )
+    fig.update_layout(title_font_size=16)
+    st.plotly_chart(fig)
+
+
+    ## Taux Std Monde
+    st.subheader(f"🌐 Évolution du taux standardisé Monde - {hm_libelle}")
+
+    #fig, ax = plt.subplots(figsize=(10, 5))
+    #sns.lineplot(
+    #    data=df_resultats_region,
+    #    x="Période", y="taux_std_monde", hue="sexe", marker="o", ax=ax
+    #)
+    #ax.set_title("Taux standardisé Monde par période (3 départements réunis)", fontsize=14)
+    #ax.set_ylabel("Taux pour 100 000 hab.")
+    #ax.set_xlabel("Période")
+    #ax.grid(True)
+    #plt.xticks(rotation=45)
+    #st.pyplot(fig)
+
+    ##Fig plotly
+    fig = px.line(
+        df_resultats_region,
+        x="Période", y="taux_std_monde",
+        color="sexe", markers=True,
+        title=f"Taux standardisé Monde ({zone_label})",
+        labels={"taux_std_monde": "Taux / 100 000 hab."}
+    )
+    fig.update_layout(title_font_size=16)
+    st.plotly_chart(fig)
+
+
+    ### INCIDENCE TOUT SEXE CONFONDU ###
+    df_cas_grouped_total = df_cas.groupby(["periode", "age_tranche"], as_index=False)["n"].sum()
+
+    ### Agrégation des populations : somme des sexes pour les cas et les pop ref
+    pop_total = df_pop_grouped[
+        (df_pop_grouped["zone"].isin(departements_selectionnes))
+    ].groupby(["periode", "age_tranche"], as_index=False)["population"].sum()
+
+    ref_europe_total = df_pop_grouped[df_pop_grouped["zone"].str.startswith("Europe")].groupby(
+        ["periode", "age_tranche"], as_index=False)["population"].sum().rename(columns={"population": "pop_ref"})
+
+    ref_monde_total = df_pop_grouped[df_pop_grouped["zone"].str.startswith("Monde")].groupby(
+        ["periode", "age_tranche"], as_index=False)["population"].sum().rename(columns={"population": "pop_ref"})
+
+    ### Calculs des taux globaux (2 sexes)
+    resultats_total = []
+
+    for periode in sorted(df_cas["periode"].dropna().unique()):
+        cas = df_cas_grouped_total[df_cas_grouped_total["periode"] == periode]
+        pop_zone = pop_total[pop_total["periode"] == periode]
+
+        df = pd.merge(pop_zone, cas, on="age_tranche", how="left").fillna({"n": 0})
+
+        total_cas = df["n"].sum()
+        total_pop = df["population"].sum()
+        taux_brut = (total_cas / total_pop) * 100000 if total_pop > 0 else np.nan
+
+        # Standardisation Europe
+        ref_eu = ref_europe_total[ref_europe_total["periode"] == periode]
+        df_eu = pd.merge(df, ref_eu, on="age_tranche", how="inner")
+        df_eu = df_eu[df_eu["pop_ref"].notna() & (df_eu["pop_ref"] > 0)]
+        taux_std_eu = ((df_eu["n"] / df_eu["population"]) * df_eu["pop_ref"]).sum() / df_eu["pop_ref"].sum() * 100000
+
+        # Standardisation Monde
+        ref_mo = ref_monde_total[ref_monde_total["periode"] == periode]
+        df_mo = pd.merge(df, ref_mo, on="age_tranche", how="inner")
+        df_mo = df_mo[df_mo["pop_ref"].notna() & (df_mo["pop_ref"] > 0)]
+        taux_std_mo = ((df_mo["n"] / df_mo["population"]) * df_mo["pop_ref"]).sum() / df_mo["pop_ref"].sum() * 100000
+
+        resultats_total.append({
+            "Période": periode,
+            "taux_brut": round(taux_brut, 2),
+            "taux_std_europe": round(taux_std_eu, 2),
+            "taux_std_monde": round(taux_std_mo, 2)
+        })
+
+    df_resultats_total = pd.DataFrame(resultats_total)
+
+    st.subheader(f"📊 Taux d’incidence – 2 sexes confondus - {hm_libelle}")
+    st.dataframe(df_resultats_total)
+
+    ### Graphiques
+    zone_label = ", ".join(departements_selectionnes)
+
+    # Taux brut
+    fig = px.line(
+        df_resultats_total, x="Période", y="taux_brut",
+        markers=True,
+        title=f"Taux brut d’incidence (2 sexes confondus) – {zone_label}",
+        labels={"taux_brut": "Taux pour 100 000 hab."}
+    )
+    st.plotly_chart(fig)
+
+    # Taux standardisé Europe
+    fig = px.line(
+        df_resultats_total, x="Période", y="taux_std_europe",
+        markers=True,
+        title=f"Taux standardisé Europe (2 sexes confondus) – {zone_label}",
+        labels={"taux_std_europe": "Taux pour 100 000 hab."}
+    )
+    st.plotly_chart(fig)
+
+    # Taux standardisé Monde
+    fig = px.line(
+        df_resultats_total, x="Période", y="taux_std_monde",
+        markers=True,
+        title=f"Taux standardisé Monde (2 sexes confondus) – {zone_label}",
+        labels={"taux_std_monde": "Taux pour 100 000 hab."}
+    )
+    st.plotly_chart(fig)
 
     st.title("📈 Analyse de survie par sexe (Kaplan-Meier)")
 
