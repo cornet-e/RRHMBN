@@ -1124,7 +1124,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 
-# Analyse Survie par sexe et groupe age
+### Analyse Survie par sexe et groupe age ###
 
 df2 = hm[['fup', 'event', 'sex', 'groupe_age']].dropna()
 df2['sex'] = df2['sex'].astype(str)
