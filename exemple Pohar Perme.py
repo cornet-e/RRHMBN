@@ -3,6 +3,22 @@ import numpy as np
 from lifelines import KaplanMeierFitter, CoxPHFitter
 import matplotlib.pyplot as plt
 
+
+# Chargement du fichier Excel, feuille "T67e"
+fichier = "fm_t67_clean.xlsx"
+df = pd.read_excel(fichier, sheet_name="T67e")
+
+# Conversion du format large vers format long
+df_long = df.melt(id_vars="Année", var_name="Tranche_d_âge", value_name="Taux_mortalité")
+
+# Affichage des 10 premières lignes pour vérification
+print(df_long.head(10))
+
+# Optionnel : sauvegarde du format long dans un nouveau fichier
+df_long.to_csv("mortality_tidy.csv", index=False)
+
+
+
 # Exemple de données de survie pour des patients
 # 'time' : Temps de survie (mois)
 # 'event' : 1 = Décès, 0 = Censuré
