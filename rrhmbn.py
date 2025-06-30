@@ -1058,7 +1058,7 @@ df_insee = {
     "femmes": pd.read_excel("fm_t67_clean.xlsx", sheet_name="T67f")
 }
 
-ages_depart = [30, 50, 70, 90]
+ages_depart = [30, 45, 60, 75]
 
 # Assure-toi que ton dataframe hm contient au moins 'age', 'sex', 'annee_diag'
 # Exemple d'appel :
@@ -1067,7 +1067,7 @@ df_survie_moyenne = courbe_survie_moyenne_age_depart(hm, df_insee, ages_depart)
 # Tracé
 fig = go.Figure()
 
-colors = {30: "green", 50: "orange", 70: "red", 90: "purple"}
+colors = {30:"blue", 45: "green", 60: "red", 75: "purple"}
 
 for age_dep in ages_depart:
     df_sub = df_survie_moyenne[df_survie_moyenne["age_depart"] == age_dep]
