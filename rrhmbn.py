@@ -144,8 +144,13 @@ if file is not None:
 
         # Charger le fichier correspondance ICDO-ICD10-ICD11
         df_icdo2 = pd.read_excel("ICD-O_ICD11_ICD10_correspondance.xlsx")
-
-        df_icdo2["ICD-O code"] = df_icdo2["ICD-O code"].astype(str).str.strip()
+        
+        # Transformation du champ ICD-O code
+        df_icdo2["ICD-O code"] = (
+        df_icdo2["ICD-O code"]
+        .astype(str)        # conversion en texte si ce n’est pas déjà le cas
+        .str.replace("/", "", regex=False)  # suppression du "/"
+        )
 
         # Merge sur le code ICD-O code
         df_final2 = df_final.merge(
