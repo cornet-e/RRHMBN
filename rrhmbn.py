@@ -1136,7 +1136,9 @@ df_survie_moyenne = courbe_survie_moyenne_age_depart(hm, df_insee, ages_depart)
 # Tracé
 fig = go.Figure()
 
-colors = {30:"blue", 45: "green", 60: "red", 75: "purple"}
+colors = {30:"blue", 45: "green", 60: "pink", 75: "purple"}
+colors_sex = {"1": "red", "2": "gray"}  # adapte selon les valeurs réelles de ta variable 'sex'
+
 
 for age_dep in ages_depart:
     df_sub = df_survie_moyenne[df_survie_moyenne["age_depart"] == age_dep]
@@ -1161,7 +1163,7 @@ for sex in groups:
         y=kmf.survival_function_[f"Sexe {sex}"],
         mode='lines',
         name=f"Sexe {sex}",
-        line=dict(color=colors.get(sex, 'gray')),
+        line=dict(color=colors_sex.get(sex, 'gray')),
     ))
 
     # IC (bande)
