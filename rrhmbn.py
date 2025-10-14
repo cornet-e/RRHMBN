@@ -1682,3 +1682,67 @@ st.plotly_chart(fig6, use_container_width=True)
 
 #else:
 #    st.error("Les données valides (rrhmbn_valide) ne sont pas encore chargées.")
+
+
+###### POHAR-PERME
+
+# example_pohar_rpy2.py
+import pandas as pd
+from rpy2.robjects import r, pandas2ri
+import rpy2.robjects.packages as rpackages
+from rpy2.robjects.conversion import localconverter
+
+# activer conversion pandas <-> R
+pandas2ri.activate()
+
+# vérification / installation (optionnel)
+utils = rpackages.importr('utils')
+utils.chooseCRANmirror(ind=1)  # choisir un miroir
+if not rpackages.isinstalled('relsurv'):
+    utils.install_packages('relsurv')
+
+# importer relsurv
+relsurv = rpackages.importr('relsurv')
+survival = rpackages.importr('survival')  # pour Surv
+
+# 🔄 Renommer les colonnes critiques de hm par leur nom actuel
+mapping = {
+    "fup" : "time",
+    "event": "status",
+    "DateDuDiag": "year"
+}
+
+# Appliquer le renommage uniquement si les colonnes existent
+hm_pohar = hm.rename(columns={k: v for k, v in mapping.items() if k in hm.columns}, inplace=True)
+hm["time"] = hm["time"] * 30.4375
+
+
+
+
+
+# convertir vers R
+with localconverter(rpy2.robjects.default_converter + pandas2ri.converter):
+    r_df = pandas2ri.py2rpy(hm_pohar)
+
+# exemple d'appel : rs.surv (méthode 'pohar-perme')
+# formule R : Surv(time, status) ~ 1   (pas de covariables, estimation marginale)
+r.assign('r_df', r_df)
+r('library(relsurv)')
+# utiliser le jeu de tables de population intégré 'slopop' pour tester (exemple/demo)
+r('data(slopop, package="relsurv")')  
+
+# appeler rs.surv (method = "pohar-perme")
+r('''
+res <- rs.surv(Surv(time, status) ~ 1, data = r_df,
+               ratetable = slopop, method = "pohar-perme")
+# afficher un résumé (résultat 'survfit' R)
+print(summary(res))
+''')
+
+# si vous voulez ramener le résultat en Python, récupérez res
+res = r('res')
+# par ex. récupérer times et surv :
+times = list(r('res$time'))
+surv  = list(r('res$surv'))
+print("times:", times)
+print("net survival (Pohar-Perme):", surv)
