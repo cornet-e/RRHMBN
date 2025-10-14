@@ -142,12 +142,32 @@ if file is not None:
         # supprimer la colonne 'ICD-O-3' (doublon)
         df_final = df_final.drop(columns=["ICD-O-3"])
 
+        # Charger le fichier correspondance ICDO-ICD10-ICD11
+        df_icdo2 = pd.read_excel("ICD-O_ICD11_ICD10_correspondance.xlsx")
+
+        df_icdo2["ICD-O code"] = df_icdo2["ICD-O code"].astype(str).str.strip()
+
+        # Merge sur le code ICD-O code
+        df_final2 = df_final.merge(
+            df_icdo2[[
+                "ICD-O code",
+                "ICD-11 code 1", "ICD-11 label 1",
+                "ICD-11 code 2", "ICD-11 label 2",
+                "icd10Code", "icd10Title"
+            ]],
+            left_on="Code_MORPHO_Diag",
+            right_on="ICD-O code",
+            how="left"
+        )
+
+
+
         # --- Sauvegarde du fichier filtré ---
         # fichier_sortie = "rrhmbn.xlsx"
         # df_final.to_excel(fichier_sortie, index=False)
         #print(f"\n💾 Fichier sauvegardé : {fichier_sortie}")
 
-        rrhmbn = df_final
+        rrhmbn = df_final2
 
         # 🔄 Renommer les colonnes critiques par leur nom actuel
         mapping = {
