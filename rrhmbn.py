@@ -172,7 +172,7 @@ if file is not None:
         # df_final.to_excel(fichier_sortie, index=False)
         #print(f"\n💾 Fichier sauvegardé : {fichier_sortie}")
 
-        rrhmbn = df_final2
+        rrhmbn = df_final
 
         # 🔄 Renommer les colonnes critiques par leur nom actuel
         mapping = {
@@ -281,7 +281,7 @@ st.header("🧬 Sélection d’un sous-ensemble de pathologies (HM)")
 if 'rrhmbn_valide' in locals():
 
     # Méthode de classification
-    choix0 = st.radio("Choix de classification :", ["REPIH", "XT"])
+    choix0 = st.radio("Choix de classification :", ["REPIH", "XT", "ICDO", "ADICAP"])
 
     if choix0 == "REPIH":
         choix = st.radio("Type de sélection :", ["Groupe Patho", "Sous-Type Patho"])
@@ -310,6 +310,50 @@ if 'rrhmbn_valide' in locals():
         xt_label_sel = st.selectbox("Sélectionnez un sous-type XT patho :", sorted(xt_labels))
         hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_XT_label"] == xt_label_sel]
         hm_libelle = hm["patho_sous_type_XT_label"].iloc[0] if not hm.empty else None
+    
+    # elif choix0 == "ICDO":
+    #     icdo = rrhmbn_valide["Code_MORPHO_Diag"].dropna().unique()
+    #     icdo_sel = st.selectbox("Sélectionnez un code ICDO :", sorted(icdo))
+    #     hm = rrhmbn_valide[rrhmbn_valide["Code_MORPHO_Diag"] == icdo_sel]
+    #     hm_libelle = hm["Code_MORPHO_Diag"].iloc[0] if not hm.empty else None
+    
+    elif choix0 == "ICDO":
+        icdo = rrhmbn_valide["Code_MORPHO_Diag"].dropna().unique()
+    
+        # Permet plusieurs choix
+        icdo_sel = st.multiselect("Sélectionnez un ou plusieurs codes ICDO :", sorted(icdo))
+    
+        # Filtrer les lignes correspondant aux choix multiples
+        if icdo_sel:
+            hm = rrhmbn_valide[rrhmbn_valide["Code_MORPHO_Diag"].isin(icdo_sel)]
+            hm_libelle = ", ".join(hm["Code_MORPHO_Diag"].unique())
+        else:
+            hm = rrhmbn_valide.copy()
+            hm_libelle = None
+
+    elif choix0 == "ADICAP":
+        adicap = rrhmbn_valide["Code_ADICAP_Diag"].dropna().unique()
+    
+        # Permet plusieurs choix
+        adicap_sel = st.multiselect("Sélectionnez un ou plusieurs codes ADICAP :", sorted(adicap))
+    
+        # Filtrer les lignes correspondant aux choix multiples
+        if adicap_sel:
+            hm = rrhmbn_valide[rrhmbn_valide["Code_ADICAP_Diag"].isin(adicap_sel)]
+            hm_libelle = ", ".join(hm["Code_ADICAP_Diag"].unique())
+        else:
+            hm = rrhmbn_valide.copy()
+            hm_libelle = None
+
+# affichage des correspondances de classification
+
+st.subheader("Affichage d'un tableau de correspondance des classifications ICD-O / ICD-11 /  ICD-10")
+
+if st.button("Afficher le tableau de correspondance"):
+    df_correspondance = pd.read_excel("ICD-O_ICD11_ICD10_correspondance.xlsx")
+    with st.expander("📊 Tableau de correspondance", expanded=True):
+        st.dataframe(df_correspondance)
+
 
 # Affichage et sauvegarde
 if 'hm' in locals() and not hm.empty:
