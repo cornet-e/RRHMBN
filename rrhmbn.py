@@ -1682,3 +1682,23 @@ st.plotly_chart(fig6, use_container_width=True)
 
 #else:
 #    st.error("Les données valides (rrhmbn_valide) ne sont pas encore chargées.")
+
+
+# --- Section : Étude de la survie relative (Pohar-Perme) ---
+st.markdown("## Étude de la survie relative (Pohar-Perme)")
+
+# Vérifie que la dataframe hm existe
+if 'hm' in locals() or 'hm' in globals():
+    st.write("Aperçu de la table `hm` :")
+    st.dataframe(hm)
+
+    # Bouton de téléchargement
+    csv = hm.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Télécharger hm.csv",
+        data=csv,
+        file_name="hm.csv",
+        mime="text/csv"
+    )
+else:
+    st.warning("⚠️ La dataframe `hm` n’a pas encore été générée.")
