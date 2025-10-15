@@ -1686,63 +1686,91 @@ st.plotly_chart(fig6, use_container_width=True)
 
 ###### POHAR-PERME
 
-# example_pohar_rpy2.py
+import streamlit as st
 import pandas as pd
-from rpy2.robjects import r, pandas2ri
-import rpy2.robjects.packages as rpackages
-from rpy2.robjects.conversion import localconverter
+import subprocess
+import tempfile
+import os
+import plotly.graph_objects as go
 
-# activer conversion pandas <-> R
-pandas2ri.activate()
+st.set_page_config(page_title="Analyse Pohar-Perme", layout="wide")
 
-# vérification / installation (optionnel)
-utils = rpackages.importr('utils')
-utils.chooseCRANmirror(ind=1)  # choisir un miroir
-if not rpackages.isinstalled('relsurv'):
-    utils.install_packages('relsurv')
+st.title("📈 Analyse de survie nette (méthode Pohar-Perme)")
+st.write("Cette application exécute le calcul de survie nette via **R** et le package **relsurv**, sans dépendre de `rpy2`.")
 
-# importer relsurv
-relsurv = rpackages.importr('relsurv')
-survival = rpackages.importr('survival')  # pour Surv
+# ⬆️ Import du fichier CSV
+uploaded_file = st.file_uploader("Choisissez votre fichier CSV", type=["csv"])
 
-# 🔄 Renommer les colonnes critiques de hm par leur nom actuel
-mapping = {
-    "fup" : "time",
-    "event": "status",
-    "DateDuDiag": "year"
-}
+if uploaded_file is not None:
+    hm = pd.read_csv(uploaded_file)
+    st.subheader("Aperçu du fichier importé :")
+    st.dataframe(hm.head())
 
-# Appliquer le renommage uniquement si les colonnes existent
-hm_pohar = hm.rename(columns={k: v for k, v in mapping.items() if k in hm.columns}, inplace=True)
-hm["time"] = hm["time"] * 30.4375
+    # 🔄 Mapping des colonnes attendues
+    mapping = {
+        "fup": "time",
+        "event": "status",
+        "DateDuDiag": "year"
+    }
+    hm_pohar = hm.rename(columns={k: v for k, v in mapping.items() if k in hm.columns})
+    if "time" in hm_pohar.columns:
+        hm_pohar["time"] = hm_pohar["time"] * 30.4375  # conversion mois → jours
 
+    if st.button("▶️ Lancer l'analyse Pohar-Perme"):
+        with st.spinner("Analyse en cours..."):
 
+            # Sauvegarde temporaire
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_in:
+                hm_pohar.to_csv(tmp_in.name, index=False)
+                input_path = tmp_in.name
 
+            output_path = input_path.replace(".csv", "_resultats.csv")
 
+            # Exécution de Rscript
+            try:
+                result = subprocess.run(
+                    ["Rscript", "analyse_pohar.R", input_path, output_path],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                st.text(result.stdout)
 
-# convertir vers R
-with localconverter(rpy2.robjects.default_converter + pandas2ri.converter):
-    r_df = pandas2ri.py2rpy(hm_pohar)
+                # Lecture des résultats
+                if os.path.exists(output_path):
+                    df_res = pd.read_csv(output_path)
+                    st.success("Analyse terminée ✅")
+                    st.dataframe(df_res.head())
 
-# exemple d'appel : rs.surv (méthode 'pohar-perme')
-# formule R : Surv(time, status) ~ 1   (pas de covariables, estimation marginale)
-r.assign('r_df', r_df)
-r('library(relsurv)')
-# utiliser le jeu de tables de population intégré 'slopop' pour tester (exemple/demo)
-r('data(slopop, package="relsurv")')  
-
-# appeler rs.surv (method = "pohar-perme")
-r('''
-res <- rs.surv(Surv(time, status) ~ 1, data = r_df,
-               ratetable = slopop, method = "pohar-perme")
-# afficher un résumé (résultat 'survfit' R)
-print(summary(res))
-''')
-
-# si vous voulez ramener le résultat en Python, récupérez res
-res = r('res')
-# par ex. récupérer times et surv :
-times = list(r('res$time'))
-surv  = list(r('res$surv'))
-print("times:", times)
-print("net survival (Pohar-Perme):", surv)
+                    # 🔹 Graphique interactif
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=df_res["time"], y=df_res["surv"],
+                        mode="lines", name="Survie nette (Pohar-Perme)"
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=df_res["time"], y=df_res["lower"],
+                        mode="lines", line=dict(dash="dot"), name="IC inférieur"
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=df_res["time"], y=df_res["upper"],
+                        mode="lines", line=dict(dash="dot"), name="IC supérieur"
+                    ))
+                    fig.update_layout(
+                        title="Courbe de survie nette (méthode Pohar-Perme)",
+                        xaxis_title="Temps (jours)",
+                        yaxis_title="Survie nette",
+                        template="simple_white"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.error("Le fichier de sortie n’a pas été trouvé.")
+            except subprocess.CalledProcessError as e:
+                st.error("Erreur lors de l'exécution du script R :")
+                st.code(e.stderr)
+            finally:
+                # Nettoyage
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                if os.path.exists(output_path):
+                    os.remove(output_path)
