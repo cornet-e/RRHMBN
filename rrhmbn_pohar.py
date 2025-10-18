@@ -41,22 +41,6 @@ if data_file and mlt_file and flt_file:
     st.write("Colonnes mlt:", mlt.columns)
     st.write("Colonnes flt:", flt.columns)
 
-    # --- Fonction survie attendue ---
-    def expected_survival(age_days, year_frac, sex_num):
-        surv = []
-        for a, y, s in zip(age_days, year_frac, sex_num):
-            age = int(a // 365.24)
-            year = int(y)
-            if s == 1:
-                rates = mlt[(mlt['age']==age) & (mlt['year']==year)]['rate']
-            else:
-                rates = flt[(flt['age']==age) & (flt['year']==year)]['rate']
-            r = rates.values[0] if len(rates) > 0 else 0
-            surv.append(1-r)
-        return np.array(surv)
-
-    df['surv_exp'] = expected_survival(df['age_days'], df['year_frac'], df['sex'])
-
     # --- Kaplan-Meier avec IC de Greenwood ---
     def kaplan_meier_ic(df_subset, alpha=0.05):
         df_sorted = df_subset.sort_values('time')
@@ -78,27 +62,51 @@ if data_file and mlt_file and flt_file:
                 if n-d > 0:
                     cum_var += d / (n*(n-d))
             surv.append(cum_surv)
-            se = np.sqrt(cum_var) * cum_surv  # IC = surv ± Z*SE
+            se = np.sqrt(cum_var) * cum_surv
             var.append(se)
         times = np.array(times)
         surv = np.array(surv)
         se = np.array(var)
-        z = 1.96  # 95% IC
+        z = 1.96
         lower = np.maximum(0, surv - z*se)
         upper = np.minimum(1, surv + z*se)
         return pd.DataFrame({'time': times, 'surv_rel': surv, 'lower': lower, 'upper': upper})
 
-    # --- Extraire les courbes ---
+    # --- Survie attendue cumulative ---
+    def expected_survival_curve(df_subset, mlt, flt):
+        df_sorted = df_subset.sort_values('time')
+        times = np.unique(df_sorted['time'])
+        surv_exp = []
+
+        for t in times:
+            at_risk = df_sorted[df_sorted['time'] >= t]
+            cum_surv = 1.0
+            for _, row in at_risk.iterrows():
+                age = int(row['age_days'] // 365.24)
+                year = int(row['year_frac'])
+                sex = row['sex']
+                if sex == 1:
+                    rates = mlt[(mlt['age']==age) & (mlt['year']==year)]['rate']
+                else:
+                    rates = flt[(flt['age']==age) & (flt['year']==year)]['rate']
+                r = rates.values[0] if len(rates) > 0 else 0
+                cum_surv *= (1 - r)
+            surv_exp.append(cum_surv)
+
+        return pd.DataFrame({'time': times, 'surv_exp': surv_exp})
+
+    # --- Calcul des courbes ---
     df_global = kaplan_meier_ic(df)
-    df_global['surv_exp'] = np.interp(df_global['time'], df['time'], df['surv_exp'])
+    df_global_exp = expected_survival_curve(df, mlt, flt)
+    df_global = df_global.merge(df_global_exp, on='time', how='left')
 
     df_male = kaplan_meier_ic(df[df['sex']==1])
-    df_male['surv_exp'] = np.interp(df_male['time'], df['time'][df['sex']==1],
-                                    df['surv_exp'][df['sex']==1])
+    df_male_exp = expected_survival_curve(df[df['sex']==1], mlt, flt)
+    df_male = df_male.merge(df_male_exp, on='time', how='left')
 
     df_female = kaplan_meier_ic(df[df['sex']==2])
-    df_female['surv_exp'] = np.interp(df_female['time'], df['time'][df['sex']==2],
-                                      df['surv_exp'][df['sex']==2])
+    df_female_exp = expected_survival_curve(df[df['sex']==2], mlt, flt)
+    df_female = df_female.merge(df_female_exp, on='time', how='left')
 
     # --- Plotly avec IC et survie attendue ---
     def plot_surv(df_plot, title):
