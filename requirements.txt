@@ -6,3 +6,4 @@ lifelines
 openpyxl
 seaborn
 matplotlib
+rpy2
