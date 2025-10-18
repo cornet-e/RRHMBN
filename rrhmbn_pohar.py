@@ -72,50 +72,51 @@ if data_file and mlt_file and flt_file:
         upper = np.minimum(1, surv + z*se)
         return pd.DataFrame({'time': times, 'surv_rel': surv, 'lower': lower, 'upper': upper})
 
-    # --- Survie attendue vectorisée ---
-    def expected_survival_vectorized(df_subset, mlt, flt):
+    # --- Survie attendue ultra-optimisée ---
+    def expected_survival_fast(df_subset, mlt, flt):
         df_subset = df_subset.copy()
         df_subset['age_years'] = (df_subset['age_days'] // 365.24).astype(int)
         df_subset['year_int'] = df_subset['year_frac'].astype(int)
 
-        # fonction pour récupérer la probabilité de survie d'un patient
-        def get_surv(row):
-            if row['sex'] == 1:
-                rates = mlt[(mlt['age']==row['age_years']) & (mlt['year']==row['year_int'])]['rate']
-            else:
-                rates = flt[(flt['age']==row['age_years']) & (flt['year']==row['year_int'])]['rate']
-            r = rates.values[0] if len(rates) > 0 else 0
-            return 1 - r
+        # Table combinée unique avec probabilité de survie
+        mlt['sex'] = 1
+        flt['sex'] = 2
+        table_all = pd.concat([mlt, flt], ignore_index=True)
+        table_all['surv_prob'] = 1 - table_all['rate']
+        table_all = table_all[['age','year','sex','surv_prob']]
 
-        df_subset['surv_prob'] = df_subset.apply(get_surv, axis=1)
+        # Merge pour récupérer surv_prob par patient
+        df_subset = df_subset.merge(table_all, left_on=['age_years','year_int','sex'],
+                                    right_on=['age','year','sex'], how='left')
+
+        # Trier par temps
         df_subset = df_subset.sort_values('time')
+
+        # Survie attendue cumulative vectorisée
         times = np.unique(df_subset['time'])
         surv_exp = []
-
         for t in times:
-            at_risk = df_subset[df_subset['time'] >= t]
-            cum_surv = at_risk['surv_prob'].prod()
-            surv_exp.append(cum_surv)
+            surv_exp.append(df_subset[df_subset['time'] >= t]['surv_prob'].prod())
 
         return pd.DataFrame({'time': times, 'surv_exp': surv_exp})
 
     # --- Calcul des courbes ---
     df_global = kaplan_meier_ic(df)
-    df_global_exp = expected_survival_vectorized(df, mlt, flt)
+    df_global_exp = expected_survival_fast(df, mlt, flt)
     df_global = df_global.merge(df_global_exp, on='time', how='left')
 
     df_male = kaplan_meier_ic(df[df['sex']==1])
-    df_male_exp = expected_survival_vectorized(df[df['sex']==1], mlt, flt)
+    df_male_exp = expected_survival_fast(df[df['sex']==1], mlt, flt)
     df_male = df_male.merge(df_male_exp, on='time', how='left')
 
     df_female = kaplan_meier_ic(df[df['sex']==2])
-    df_female_exp = expected_survival_vectorized(df[df['sex']==2], mlt, flt)
+    df_female_exp = expected_survival_fast(df[df['sex']==2], mlt, flt)
     df_female = df_female.merge(df_female_exp, on='time', how='left')
 
     # --- Plotly avec IC et survie attendue ---
     def plot_surv(df_plot, title):
         fig = go.Figure()
-        # survie relative
+        # Survie relative
         fig.add_trace(go.Scatter(x=df_plot['time'], y=df_plot['surv_rel'],
                                  mode='lines', name='Survie relative', line=dict(color='blue', width=2)))
         # IC
@@ -123,7 +124,7 @@ if data_file and mlt_file and flt_file:
                                  fill=None, mode='lines', line=dict(color='blue', width=1), showlegend=False))
         fig.add_trace(go.Scatter(x=df_plot['time'], y=df_plot['lower'],
                                  fill='tonexty', mode='lines', line=dict(color='blue', width=1), name='IC 95%'))
-        # survie attendue
+        # Survie attendue
         fig.add_trace(go.Scatter(x=df_plot['time'], y=df_plot['surv_exp'],
                                  mode='lines', name='Survie attendue', line=dict(color='black', width=2, dash='dash')))
         fig.update_layout(title=title,
