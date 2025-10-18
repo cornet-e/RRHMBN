@@ -1704,14 +1704,15 @@ else:
     st.warning("⚠️ La dataframe `hm` n’a pas encore été générée.")
 
 
+# --- Script R (RPY2) - Pohar-Perme ---
 
 from rpy2 import robjects
-from rpy2.robjects import pandas2ri
+from rpy2.robjects import default_converter, pandas2ri
 from rpy2.robjects.packages import importr
+from rpy2.robjects.conversion import localconverter
 import plotly.graph_objects as go
 
-# --- Activer la conversion pandas <-> R ---
-pandas2ri.activate()
+st.title("Analyse de survie relative (Pohar Perme)")
 
 # --- Import des packages R ---
 relsurv = importr('relsurv')
@@ -1720,18 +1721,17 @@ readr = importr('readr')
 survival = importr('survival')
 tibble = importr('tibble')
 
-st.title("Analyse de survie relative (Pohar Perme)")
-
 # --- Upload des fichiers ---
 data_file = st.file_uploader("CSV des patients (hm.csv)", type="csv")
 mlt_file = st.file_uploader("Table hommes (mltper_1x1.txt)", type="txt")
 flt_file = st.file_uploader("Table femmes (fltper_1x1.txt)", type="txt")
 
 if data_file and mlt_file and flt_file:
+
     # Charger les fichiers dans R
-    robjects.globalenv['data'] = readr.read_csv(data_file)
-    robjects.globalenv['mlt_file'] = mlt_file.name
-    robjects.globalenv['flt_file'] = flt_file.name
+    robjects.globalenv['data_path'] = data_file.name
+    robjects.globalenv['mlt_path'] = mlt_file.name
+    robjects.globalenv['flt_path'] = flt_file.name
 
     # --- Code R complet ---
     robjects.r('''
@@ -1741,7 +1741,8 @@ if data_file and mlt_file and flt_file:
     library(survival)
     library(tibble)
 
-    data <- read_csv("''' + data_file.name + '''") %>%
+    # Charger les données
+    data <- read_csv(data_path) %>%
       mutate(
         time = fup * 30.4375,
         status = event,
@@ -1751,13 +1752,14 @@ if data_file and mlt_file and flt_file:
           ((as.numeric(format(DateDuDiag, "%m"))-0.5)/12)
       )
 
+    # Fonctions de ratetable
     read_lifetable <- function(file_path){
       lt <- read.table(file_path, header=TRUE, sep="", stringsAsFactors=FALSE, skip=2)
-      lt <- lt %>% rename(year = Year, age = Age, rate = mx)
+      lt <- lt %>% rename(year=Year, age=Age, rate=mx)
       return(lt)
     }
 
-    create_single_ratetable <- function(lt, sex = c("men","women")){
+    create_single_ratetable <- function(lt, sex=c("men","women")){
       sex <- match.arg(sex)
       ages <- sort(unique(lt$age))
       years <- sort(unique(lt$year))
@@ -1765,7 +1767,7 @@ if data_file and mlt_file and flt_file:
       for(i in seq_along(ages)){
         for(j in seq_along(years)){
           val <- lt$rate[lt$age==ages[i] & lt$year==years[j]]
-          rate_matrix[i,j] <- ifelse(length(val)==1,1-val,NA)
+          rate_matrix[i,j] <- ifelse(length(val)==1, 1-val, NA)
         }
       }
       empty_matrix <- matrix(NA, nrow=length(ages), ncol=length(years), dimnames=list(ages,years))
@@ -1778,10 +1780,13 @@ if data_file and mlt_file and flt_file:
       return(ratetable)
     }
 
-    mlt <- read_lifetable("''' + mlt_file.name + '''")
-    flt <- read_lifetable("''' + flt_file.name + '''")
-    fr.ratetable <- transrate(men=as.matrix(mlt$rate), women=as.matrix(flt$rate), yearlim=range(c(mlt$year, flt$year)), int.length=1)
+    # Charger les tables de mortalité
+    mlt <- read_lifetable(mlt_path)
+    flt <- read_lifetable(flt_path)
+    fr.ratetable <- transrate(men=as.matrix(mlt$rate), women=as.matrix(flt$rate),
+                              yearlim=range(c(mlt$year, flt$year)), int.length=1)
 
+    # Fonction pour extraire survie
     extract_surv <- function(fit, data, ratetable, step=1){
       times <- seq(0,max(data$time),by=step)
       s_rel <- summary(fit, times=times)
@@ -1807,14 +1812,13 @@ if data_file and mlt_file and flt_file:
     df_female <- extract_surv(fit_female, data %>% filter(sex_num==2), fr.ratetable)
     ''')
 
-    # Récupérer les résultats en pandas
-    df_global = pandas2ri.rpy2py(robjects.globalenv['df_global'])
-    df_male = pandas2ri.rpy2py(robjects.globalenv['df_male'])
-    df_female = pandas2ri.rpy2py(robjects.globalenv['df_female'])
+    # --- Conversion R -> pandas avec la nouvelle méthode ---
+    with localconverter(default_converter + pandas2ri.converter):
+        df_global = robjects.conversion.rpy2py(robjects.globalenv['df_global'])
+        df_male = robjects.conversion.rpy2py(robjects.globalenv['df_male'])
+        df_female = robjects.conversion.rpy2py(robjects.globalenv['df_female'])
 
-    # --- Onglets Streamlit ---
-    tab1, tab2, tab3 = st.tabs(["Global", "Hommes", "Femmes"])
-
+    # --- Fonction Plotly ---
     def plot_surv(df, title):
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df['time'], y=df['surv_rel'], mode='lines', name='Survie relative', line=dict(color='blue', width=2)))
@@ -1824,6 +1828,8 @@ if data_file and mlt_file and flt_file:
         fig.update_layout(title=title, xaxis_title="Temps (jours)", yaxis_title="Survie", template="plotly_white")
         st.plotly_chart(fig, use_container_width=True)
 
+    # --- Onglets ---
+    tab1, tab2, tab3 = st.tabs(["Global", "Hommes", "Femmes"])
     with tab1:
         plot_surv(df_global, "Survie relative - Global")
     with tab2:
