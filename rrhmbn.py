@@ -1691,14 +1691,12 @@ import webbrowser
 
 st.markdown("## Étude de la survie relative (Pohar-Perme)")
 
-if 'hm' in locals() or 'hm' in globals():
-    st.write("Aperçu de la table `hm` :")
-    st.dataframe(hm)
+shiny_url = "https://shiny.emvle.fr/rrhmbn"
+upload_endpoint = f"{shiny_url}/upload_csv"
 
-    # Génération du CSV
+if 'hm' in locals() or 'hm' in globals():
     csv_data = hm.to_csv(index=False).encode('utf-8')
 
-    # Bouton de téléchargement
     st.download_button(
         label="📥 Télécharger hm.csv",
         data=csv_data,
@@ -1706,23 +1704,15 @@ if 'hm' in locals() or 'hm' in globals():
         mime="text/csv"
     )
 
-    # Bouton pour envoyer directement au serveur Shiny
-    if st.button("🚀 Envoyer hm.csv à Shiny et ouvrir le dashboard"):
-        shiny_url = "https://shiny.emvle.fr/rrhmbn"
-        upload_endpoint = f"{shiny_url}/upload_csv"
+    st.markdown(f"[🚀 Ouvrir le dashboard Shiny]({shiny_url})", unsafe_allow_html=True)
 
+    if st.button("📤 Envoyer hm.csv à Shiny via API"):
         try:
             files = {"data": ("hm.csv", csv_data)}
             response = requests.post(upload_endpoint, files=files)
-
             if response.status_code == 200:
-                st.success("CSV envoyé avec succès ! Ouverture du dashboard Shiny...")
-                webbrowser.open(shiny_url)
+                st.success("CSV envoyé avec succès !")
             else:
                 st.error(f"Erreur lors de l'envoi : {response.status_code} {response.text}")
-
         except Exception as e:
-            st.error(f"Erreur : {e}")
-
-else:
-    st.warning("⚠️ La dataframe `hm` n’a pas encore été générée.")
+            st.error(f"Erreur lors de l'envoi : {e}")
