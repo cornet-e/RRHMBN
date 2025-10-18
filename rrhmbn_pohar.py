@@ -20,7 +20,7 @@ if data_file and mlt_file and flt_file:
     df['year_frac'] = pd.to_datetime(df['DateDuDiag']).dt.year + \
                       (pd.to_datetime(df['DateDuDiag']).dt.month - 0.5)/12
 
-    # --- Chargement tables de mortalité robustes ---
+    # --- Chargement tables de mortalité ---
     def read_lifetable(file_path):
         lt = pd.read_csv(file_path, sep=None, engine='python', skiprows=2)
         lt.columns = [c.strip() for c in lt.columns]
@@ -72,17 +72,17 @@ if data_file and mlt_file and flt_file:
         upper = np.minimum(1, surv + z*se)
         return pd.DataFrame({'time': times, 'surv_rel': surv, 'lower': lower, 'upper': upper})
 
-    # --- Survie attendue ultra-optimisée ---
-    def expected_survival_fast(df_subset, mlt, flt):
+    # --- Survie attendue correcte ---
+    def expected_survival_correct(df_subset, mlt, flt):
         df_subset = df_subset.copy()
         df_subset['age_years'] = (df_subset['age_days'] // 365.24).astype(int)
         df_subset['year_int'] = df_subset['year_frac'].astype(int)
 
-        # Table combinée unique avec probabilité de survie
+        # Table combinée unique avec taux journaliers
         mlt['sex'] = 1
         flt['sex'] = 2
         table_all = pd.concat([mlt, flt], ignore_index=True)
-        table_all['surv_prob'] = 1 - table_all['rate']
+        table_all['surv_prob'] = (1 - table_all['rate']) ** (1/365.25)  # taux annuel -> journalier
         table_all = table_all[['age','year','sex','surv_prob']]
 
         # Merge pour récupérer surv_prob par patient
@@ -91,26 +91,30 @@ if data_file and mlt_file and flt_file:
 
         # Trier par temps
         df_subset = df_subset.sort_values('time')
-
-        # Survie attendue cumulative vectorisée
         times = np.unique(df_subset['time'])
+
         surv_exp = []
         for t in times:
-            surv_exp.append(df_subset[df_subset['time'] >= t]['surv_prob'].prod())
-
+            # patients à risque à ce temps
+            at_risk = df_subset[df_subset['time'] >= t]
+            if len(at_risk) == 0:
+                surv_exp.append(np.nan)
+            else:
+                # survie attendue moyenne cumulative
+                surv_exp.append(at_risk['surv_prob'].prod())
         return pd.DataFrame({'time': times, 'surv_exp': surv_exp})
 
     # --- Calcul des courbes ---
     df_global = kaplan_meier_ic(df)
-    df_global_exp = expected_survival_fast(df, mlt, flt)
+    df_global_exp = expected_survival_correct(df, mlt, flt)
     df_global = df_global.merge(df_global_exp, on='time', how='left')
 
     df_male = kaplan_meier_ic(df[df['sex']==1])
-    df_male_exp = expected_survival_fast(df[df['sex']==1], mlt, flt)
+    df_male_exp = expected_survival_correct(df[df['sex']==1], mlt, flt)
     df_male = df_male.merge(df_male_exp, on='time', how='left')
 
     df_female = kaplan_meier_ic(df[df['sex']==2])
-    df_female_exp = expected_survival_fast(df[df['sex']==2], mlt, flt)
+    df_female_exp = expected_survival_correct(df[df['sex']==2], mlt, flt)
     df_female = df_female.merge(df_female_exp, on='time', how='left')
 
     # --- Plotly avec IC et survie attendue ---
