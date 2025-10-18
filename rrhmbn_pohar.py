@@ -20,20 +20,32 @@ if data_file and mlt_file and flt_file:
     df['year_frac'] = pd.to_datetime(df['DateDuDiag']).dt.year + \
                       (pd.to_datetime(df['DateDuDiag']).dt.month - 0.5)/12
 
-    # --- Chargement tables de mortalité ---
+    # --- Chargement tables de mortalité robustes ---
     def read_lifetable(file_path):
-        lt = pd.read_csv(file_path, sep='\t', skiprows=2)
-        lt = lt.rename(columns={'Year': 'year', 'Age': 'age', 'mx': 'rate'})
-        return lt
+        # détection automatique du séparateur
+        lt = pd.read_csv(file_path, sep=None, engine='python', skiprows=2)
+        # nettoyer les noms de colonnes
+        lt.columns = [c.strip() for c in lt.columns]
+        # renommer les colonnes principales
+        rename_dict = {}
+        for c in lt.columns:
+            if c.lower().startswith('year'):
+                rename_dict[c] = 'year'
+            elif c.lower().startswith('age'):
+                rename_dict[c] = 'age'
+            elif c.lower().startswith('mx') or c.lower().startswith('rate'):
+                rename_dict[c] = 'rate'
+        lt = lt.rename(columns=rename_dict)
+        return lt[['year','age','rate']]
 
     mlt = read_lifetable(mlt_file)
     flt = read_lifetable(flt_file)
 
+    st.write("Colonnes mlt:", mlt.columns)
+    st.write("Colonnes flt:", flt.columns)
+
     # --- Fonction survie attendue simple ---
     def expected_survival(age_days, year_frac, sex_num):
-        """
-        Approximation: survival = product of (1 - rate) over age years
-        """
         surv = []
         for a, y, s in zip(age_days, year_frac, sex_num):
             age = int(a // 365.24)
@@ -46,10 +58,9 @@ if data_file and mlt_file and flt_file:
             surv.append(1-r)
         return np.array(surv)
 
-    # --- Calcul survie relative approximative ---
     df['surv_exp'] = expected_survival(df['age_days'], df['year_frac'], df['sex'])
 
-    # --- Fonction pour courbes Kaplan-Meier ---
+    # --- Fonction Kaplan-Meier ---
     def kaplan_meier(df_subset):
         df_sorted = df_subset.sort_values('time')
         times = np.unique(df_sorted['time'])
@@ -98,3 +109,4 @@ if data_file and mlt_file and flt_file:
         plot_surv(df_male, "Survie relative - Hommes")
     with tab3:
         plot_surv(df_female, "Survie relative - Femmes")
+        
