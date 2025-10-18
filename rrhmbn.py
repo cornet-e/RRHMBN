@@ -1714,6 +1714,22 @@ import plotly.graph_objects as go
 
 st.title("Analyse de survie relative (Pohar Perme)")
 
+
+from rpy2.robjects.packages import importr
+from rpy2.robjects.vectors import StrVector
+from rpy2.robjects import r
+
+# Installer relsurv si nécessaire
+utils = importr('utils')
+utils.chooseCRANmirror(ind=1)  # choisir le miroir
+packnames = ('relsurv',)
+names_to_install = [x for x in packnames if not utils.installed_packages()[0].rx2('Package').ro != x]
+if names_to_install:
+    utils.install_packages(StrVector(names_to_install))
+
+relsurv = importr('relsurv')
+
+
 # --- Import des packages R ---
 relsurv = importr('relsurv')
 dplyr = importr('dplyr')
