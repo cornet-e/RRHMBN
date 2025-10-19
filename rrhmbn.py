@@ -1712,13 +1712,16 @@ if 'hm' in locals() or 'hm' in globals():
     st.markdown(f"[🚀 Ouvrir le dashboard Shiny]({shiny_url})", unsafe_allow_html=True)
 
     # Option : envoyer le CSV via POST si le serveur Shiny accepte les requêtes externes
+    upload_endpoint = "https://shiny.emvle.fr/rrhmbn/upload_csv"
+    files = {"file": ("hm.csv", csv_data, "text/csv")}
+    
     try:
-        upload_endpoint = f"{shiny_url}/upload_csv"
-        response = requests.post(upload_endpoint, files={"data": ("hm.csv", csv_data)}, verify=False)
+        response = requests.post(upload_endpoint, files=files, verify=False)
         if response.status_code == 200:
-            st.success("CSV envoyé automatiquement au serveur Shiny !")
+             st.success("CSV envoyé automatiquement au serveur Shiny !")
         else:
-            st.warning(f"Échec de l'envoi automatique (status {response.status_code})")
+            st.error(f"Échec de l'envoi automatique (status {response.status_code}): {response.text}")
+
     except Exception as e:
         st.warning(f"Envoi automatique impossible : {e}")
 
