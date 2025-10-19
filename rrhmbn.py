@@ -1713,10 +1713,12 @@ if 'hm' in locals() or 'hm' in globals():
 
     # Option : envoyer le CSV via POST si le serveur Shiny accepte les requêtes externes
     upload_endpoint = "https://shiny.emvle.fr/rrhmbn/upload_csv"
-    files = {"file": ("hm.csv", csv_data, "text/csv")}
+    files = {"datapath": ("hm.csv", csv_data, "text/csv")}
     
     try:
         response = requests.post(upload_endpoint, files=files, verify=False)
+        st.write("Réponse complète du serveur :", response.text)
+
         if response.status_code == 200:
              st.success("CSV envoyé automatiquement au serveur Shiny !")
         else:
