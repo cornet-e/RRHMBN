@@ -1712,7 +1712,7 @@ if 'hm' in locals() or 'hm' in globals():
     st.markdown(f"[🚀 Ouvrir le dashboard Shiny]({shiny_url})", unsafe_allow_html=True)
 
     # Option : envoyer le CSV via POST si le serveur Shiny accepte les requêtes externes
-    upload_endpoint = "https://shiny.emvle.fr/rrhmbn/upload_csv"
+    upload_endpoint = "https://shiny-upload.emvle.fr/rrhmbn/upload"
     files = {"datapath": ("hm.csv", csv_data, "text/csv")}
     
     try:
