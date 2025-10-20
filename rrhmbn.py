@@ -1710,37 +1710,36 @@ if 'hm' in locals() or 'hm' in globals():
     shiny_url = "https://shiny.emvle.fr/rrhmbn"
     st.markdown(f"[🚀 Ouvrir le dashboard Shiny]({shiny_url})", unsafe_allow_html=True)
 
-    # Option : envoyer le CSV via POST si le serveur Shiny accepte les requêtes externes
-    
-    # URL de ton endpoint d’upload
-    URL = "https://shiny-upload.emvle.fr/upload"
+    # Bouton pour envoyer le CSV via POST
+    if st.button("📤 Envoyer hm.csv au serveur Shiny"):
+        URL = "https://shiny-upload.emvle.fr/upload"
+        HEADERS = {}
 
-    # Fichier local à envoyer
-    FILE_PATH = "hm.csv"
-
-    # Si tu ajoutes une clé API plus tard :
-    # HEADERS = {"X-API-Key": "ta_cle_api"}
-    HEADERS = {}
-
-    def main():
         try:
-            with open(FILE_PATH, "rb") as f:
-                files = {"file": (FILE_PATH, f)}
+            # Sauvegarde temporaire du CSV pour l'envoi
+            with open("hm_temp.csv", "wb") as f:
+                f.write(csv_data)
+
+            # Envoi du fichier
+            with open("hm_temp.csv", "rb") as f:
+                files = {"file": ("hm.csv", f)}
                 response = requests.post(URL, files=files, headers=HEADERS, timeout=10)
 
             st.write(f"Statut : {response.status_code}")
             st.write("Réponse complète du serveur :", response.text)
 
             if response.status_code == 200:
-                st.success("CSV envoyé automatiquement au serveur Shiny !")
-            else:
-                st.error(f"Échec de l'envoi automatique (status {response.status_code}): {response.text}")
-        
-        except Exception as e:
-            st.warning(f"Envoi automatique impossible : {e}")
+                st.success("CSV envoyé avec succès au serveur Shiny !")
 
-    if __name__ == "__main__":
-        main()
+                # JavaScript pour ouvrir un nouvel onglet
+                js = f"window.open('{shiny_url}', '_blank');"
+                st.components.v1.html(f"<script>{js}</script>", height=0)
+                
+            else:
+                st.error(f"Échec de l'envoi (status {response.status_code}): {response.text}")
+
+        except Exception as e:
+            st.warning(f"Erreur lors de l'envoi : {e}")
     
        
 else:
