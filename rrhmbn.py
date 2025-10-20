@@ -1687,7 +1687,6 @@ st.plotly_chart(fig6, use_container_width=True)
 # --- Section : Étude de la survie relative (Pohar-Perme) ---
 
 import requests
-import webbrowser
 
 st.markdown("## Étude de la survie relative (Pohar-Perme)")
 
@@ -1712,20 +1711,37 @@ if 'hm' in locals() or 'hm' in globals():
     st.markdown(f"[🚀 Ouvrir le dashboard Shiny]({shiny_url})", unsafe_allow_html=True)
 
     # Option : envoyer le CSV via POST si le serveur Shiny accepte les requêtes externes
-    upload_endpoint = "https://shiny-upload.emvle.fr/upload"
-    files = {"datapath": ("hm.csv", csv_data, "text/csv")}
     
-    try:
-        response = requests.post(upload_endpoint, files=files, verify=False)
-        st.write("Réponse complète du serveur :", response.text)
+    # URL de ton endpoint d’upload
+    URL = "https://shiny-upload.emvle.fr/upload"
 
-        if response.status_code == 200:
-             st.success("CSV envoyé automatiquement au serveur Shiny !")
-        else:
-            st.error(f"Échec de l'envoi automatique (status {response.status_code}): {response.text}")
+    # Fichier local à envoyer
+    FILE_PATH = "hm.csv"
 
-    except Exception as e:
-        st.warning(f"Envoi automatique impossible : {e}")
+    # Si tu ajoutes une clé API plus tard :
+    # HEADERS = {"X-API-Key": "ta_cle_api"}
+    HEADERS = {}
 
+    def main():
+        try:
+            with open(FILE_PATH, "rb") as f:
+                files = {"file": (FILE_PATH, f)}
+                response = requests.post(URL, files=files, headers=HEADERS, timeout=10)
+
+            st.write(f"Statut : {response.status_code}")
+            st.write("Réponse complète du serveur :", response.text)
+
+            if response.status_code == 200:
+                st.success("CSV envoyé automatiquement au serveur Shiny !")
+            else:
+                st.error(f"Échec de l'envoi automatique (status {response.status_code}): {response.text}")
+        
+        except Exception as e:
+            st.warning(f"Envoi automatique impossible : {e}")
+
+    if __name__ == "__main__":
+        main()
+    
+       
 else:
     st.warning("⚠️ La dataframe `hm` n’a pas encore été générée.")
