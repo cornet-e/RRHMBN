@@ -1706,22 +1706,14 @@ if 'hm' in locals() or 'hm' in globals():
         mime="text/csv"
     )
 
-    # Lien vers le dashboard Shiny
-    shiny_url = "https://shiny.emvle.fr/rrhmbn"
-    st.markdown(f"[🚀 Ouvrir le dashboard Shiny]({shiny_url})", unsafe_allow_html=True)
-
     # Bouton pour envoyer le CSV via POST
     if st.button("📤 Envoyer hm.csv au serveur Shiny"):
         URL = "https://shiny-upload.emvle.fr/upload"
         HEADERS = {}
 
         try:
-            # Sauvegarde temporaire du CSV pour l'envoi
-            with open("hm_temp.csv", "wb") as f:
-                f.write(csv_data)
-
             # Envoi du fichier
-            with open("hm_temp.csv", "rb") as f:
+            with open("hm.csv", "rb") as f:
                 files = {"file": ("hm.csv", f)}
                 response = requests.post(URL, files=files, headers=HEADERS, timeout=10)
 
@@ -1731,9 +1723,9 @@ if 'hm' in locals() or 'hm' in globals():
             if response.status_code == 200:
                 st.success("CSV envoyé avec succès au serveur Shiny !")
 
-                # JavaScript pour ouvrir un nouvel onglet
-                js = f"window.open('{shiny_url}', '_blank');"
-                st.components.v1.html(f"<script>{js}</script>", height=0)
+                # Lien vers le dashboard Shiny
+                shiny_url = "https://shiny.emvle.fr/rrhmbn"
+                st.markdown(f"[🚀 Ouvrir le dashboard Shiny]({shiny_url})", unsafe_allow_html=False)
                 
             else:
                 st.error(f"Échec de l'envoi (status {response.status_code}): {response.text}")
