@@ -1712,8 +1712,11 @@ if 'hm' in locals() or 'hm' in globals():
         HEADERS = {}
 
         try:
+            # Sauvegarde temporaire du CSV pour l'envoi
+            with open("hm_temp.csv", "wb") as f:
+                f.write(csv_data)
             # Envoi du fichier
-            with open("hm.csv", "rb") as f:
+            with open("hm_temp.csv", "rb") as f:
                 files = {"file": ("hm.csv", f)}
                 response = requests.post(URL, files=files, headers=HEADERS, timeout=10)
 
