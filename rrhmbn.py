@@ -274,7 +274,7 @@ styled_table = tableau.style.apply(color_rows, axis=1)\
 st.subheader("📊 Nombre de cas par pathologie et sexe (groupé par patho_groupe_label, nuances de gris)")
 st.dataframe(styled_table, height=600)
 
-# 1. Nombre total de cas
+st.subheader("🦠 Nombre de cas incidents par pathologie (Top 20)")
 # === Cas ===
 global_annees_min_max_2 = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022), key="slider_annees_2")
 
@@ -319,7 +319,7 @@ nb_total = len(df_cas_global)
 st.markdown(f"**Nombre total de cas valides :** {nb_total:,}".replace(",", " "))
 
 # 2. Nombre de cas par pathologie
-st.subheader("🦠 Nombre de cas incidents par pathologie (Top 20)")
+
 # Récupérer le top 10
 top_pathos = df_cas_global["patho_sous_type_label"].value_counts().head(20)
 # Remettre sous forme de DataFrame, et trier pour affichage dans l'ordre décroissant
@@ -368,7 +368,6 @@ st.plotly_chart(fig)
 #st.pyplot(fig)
 
 #  Incidence par année
-st.subheader("📅 Nombre de cas incidents par année")
 incid = df_cas_global["annee_diag"].value_counts().sort_index()
 df_incid = incid.reset_index()
 df_incid.columns = ["Année", "Nombre de cas"]
