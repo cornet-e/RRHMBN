@@ -1706,7 +1706,7 @@ if 'hm' in locals() or 'hm' in globals():
     )
 
     # Bouton pour envoyer le CSV via POST
-    if st.button("1/ 📤 Envoyer hm.csv au serveur Shiny"):
+    if st.button("📤 Etude de la survie nette (méthode Pohar-Perme) [ouverture d'une nouvelle fenêtre]"):
         URL = "https://shiny-upload.emvle.fr/upload"
         HEADERS = {}
 
@@ -1727,8 +1727,18 @@ if 'hm' in locals() or 'hm' in globals():
 
                 # Lien vers le dashboard Shiny
                 shiny_url = "https://shiny.emvle.fr/rrhmbn_v2"
-                st.markdown(f"[2/ 🚀 Ouvrir le dashboard Shiny pour étude de la survie nette]({shiny_url})", unsafe_allow_html=False)
-                
+                # st.markdown(f"[🚀 Ouvrir le dashboard Shiny pour étude de la survie nette]({shiny_url})", unsafe_allow_html=False)
+                # Affiche un message et ouvre automatiquement le lien dans un nouvel onglet
+                st.markdown(
+                    f"""
+                    <meta http-equiv="refresh" content="2;url={shiny_url}">
+                    <script>
+                    window.open("{shiny_url}", "_blank");
+                    </script>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
             else:
                 st.error(f"Échec de l'envoi (status {response.status_code}): {response.text}")
 
