@@ -1686,7 +1686,6 @@ st.plotly_chart(fig6, use_container_width=True)
 # --- Section : Étude de la survie relative (Pohar-Perme) ---
 
 import requests
-import time
 
 st.markdown("## Étude de la survie nette (Pohar-Perme)")
 
@@ -1721,13 +1720,13 @@ if 'hm' in locals() or 'hm' in globals():
         st.write(f"Statut : {response.status_code}")
         st.write("Réponse complète du serveur :", response.text)
 
-        
-
         if response.status_code == 200:
             st.success("CSV envoyé avec succès au serveur Shiny !")
-  
         else:
             st.error(f"Échec de l'envoi (status {response.status_code}): {response.text}")
+
+    except Exception as e:
+        st.warning(f"Erreur lors de l'envoi : {e}")
 
     shiny_url = "https://shiny.emvle.fr/rrhmbn_v2"
     st.markdown(f"[🚀 Ouvrir le dashboard Shiny pour étude de la survie nette]({shiny_url})", unsafe_allow_html=False)
