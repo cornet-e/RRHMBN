@@ -210,13 +210,21 @@ else:
 st.header("📊 Statistiques descriptives du registre")
 
 # 1. Nombre total de cas
-nb_total = len(rrhmbn_valide)
+# === Cas ===
+global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
+df_cas_global = rrhmbn_valide.copy()
+df_cas_global = df_cas_global[
+    (df_cas_global["annee_diag"] >= annees_min_max[0]) &
+    (df_cas_global["annee_diag"] <= annees_min_max[1])
+]
+
+nb_total = len(df_cas_global)
 st.markdown(f"**Nombre total de cas valides :** {nb_total:,}".replace(",", " "))
 
 # 2. Nombre de cas par pathologie
 st.subheader("🦠 Nombre de cas par pathologie (Top 10)")
 # Récupérer le top 10
-top_pathos = rrhmbn_valide["patho_sous_type_label"].value_counts().head(10)
+top_pathos = df_cas_global["patho_sous_type_label"].value_counts().head(20)
 # Remettre sous forme de DataFrame, et trier pour affichage dans l'ordre décroissant
 df_top_pathos = top_pathos.reset_index()
 df_top_pathos.columns = ["Pathologie", "Nombre de cas"]
@@ -265,10 +273,9 @@ st.plotly_chart(fig)
 # 5. Incidence par année
 st.subheader("📅 Incidence par année")
 incid = rrhmbn_valide["annee_diag"].value_counts().sort_index()
-# Convertir l’index en chaîne (pas int !)
 df_incid = incid.reset_index()
 df_incid.columns = ["Année", "Nombre de cas"]
-df_incid["Année"] = df_incid["Année"].astype(str)  # <- Clé ici !
+df_incid["Année"] = df_incid["Année"].astype(str)
 
 # Affichage dans Streamlit
 st.line_chart(data=df_incid, x="Année", y="Nombre de cas")
