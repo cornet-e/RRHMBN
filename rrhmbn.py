@@ -243,6 +243,17 @@ elif icdo_choice == "ICDO /3":
     df_cas_global = df_cas_global[df_cas_global["Code_MORPHO_Diag"].astype(str).str.endswith("3")]
 # Si "ICDO /1 et /3", on garde tout
 
+
+# === Filtre sur les pathologies ===
+toutes_pathos = df_cas_global["patho_sous_type_label"].unique()
+selected_pathos = st.multiselect(
+    "Sélectionner les pathologies",
+    options=sorted(toutes_pathos),
+    default=sorted(toutes_pathos)  # toutes sélectionnées par défaut
+)
+# Appliquer le filtre
+df_cas_global = df_cas_global[df_cas_global["patho_sous_type_label"].isin(selected_pathos)]
+
 # Calcul du nombre total de cas
 nb_total = len(df_cas_global)
 
@@ -259,7 +270,7 @@ df_top_pathos = df_top_pathos.sort_values("Nombre de cas", ascending=False)
 # st.bar_chart(top_pathos)
 
 fig = px.bar(df_top_pathos, x="Pathologie", y="Nombre de cas",
-             title="Top 10 des pathologies",
+             title="Top 20 des pathologies",
              text="Nombre de cas",
              color="Nombre de cas",
              color_continuous_scale="Reds")
