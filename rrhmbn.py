@@ -215,7 +215,8 @@ global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=
 icdo_choice = st.radio(
     "Filtrer selon le code morphologique (ICD-O)",
     options=["ICDO /1", "ICDO /3", "ICDO /1 et /3"],
-    horizontal=True
+    horizontal=True,
+    index="ICDO /1 et /3"
 )
 
 df_cas_global = rrhmbn_valide.copy()
