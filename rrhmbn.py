@@ -1706,49 +1706,79 @@ if 'hm' in locals() or 'hm' in globals():
         mime="text/csv"
     )
 
-    # Bouton pour envoyer le CSV via POST
-    if st.button("📤 Etude de la survie nette (méthode Pohar-Perme) [ouverture d'une nouvelle fenêtre]"):
-        URL = "https://shiny-upload.emvle.fr/upload"
-        HEADERS = {}
+    URL = "https://shiny-upload.emvle.fr/upload"
+    HEADERS = {}
 
-        try:
-            # Sauvegarde temporaire du CSV pour l'envoi
-            with open("hm_temp.csv", "wb") as f:
-                f.write(csv_data)
-            # Envoi du fichier
-            with open("hm_temp.csv", "rb") as f:
-                files = {"file": ("hm.csv", f)}
-                response = requests.post(URL, files=files, headers=HEADERS, timeout=10)
+    try:
+        # Sauvegarde temporaire du CSV pour l'envoi
+        with open("hm_temp.csv", "wb") as f:
+            f.write(csv_data)
+        # Envoi du fichier
+        with open("hm_temp.csv", "rb") as f:
+            files = {"file": ("hm.csv", f)}
+            response = requests.post(URL, files=files, headers=HEADERS, timeout=10)
 
-            st.write(f"Statut : {response.status_code}")
-            st.write("Réponse complète du serveur :", response.text)
+        st.write(f"Statut : {response.status_code}")
+        st.write("Réponse complète du serveur :", response.text)
 
-            if response.status_code == 200:
-                st.success("CSV envoyé avec succès au serveur Shiny !")
+        
 
-                # Lien vers le dashboard Shiny
-                shiny_url = "https://shiny.emvle.fr/rrhmbn_v2"
-                # st.markdown(f"[🚀 Ouvrir le dashboard Shiny pour étude de la survie nette]({shiny_url})", unsafe_allow_html=False)
-                # Affiche un message et ouvre automatiquement le lien dans un nouvel onglet
-                st.markdown(
-                    f"""
-                    <p>Le fichier a bien été transmis. Ouverture du tableau de bord Shiny...</p>
-                    <p><a href="{shiny_url}" target="_blank">🚀 Ouvrir le dashboard manuellement</a></p>
-                    <script>
-                        // Attendre un court délai pour laisser Streamlit actualiser la page
-                        setTimeout(() => {{
-                            window.open("{shiny_url}", "_blank");
-                        }}, 800);
-                    </script>
-                    """,
-                    unsafe_allow_html=True
-                )
+        if response.status_code == 200:
+            st.success("CSV envoyé avec succès au serveur Shiny !")
+  
+        else:
+            st.error(f"Échec de l'envoi (status {response.status_code}): {response.text}")
 
-            else:
-                st.error(f"Échec de l'envoi (status {response.status_code}): {response.text}")
+    shiny_url = "https://shiny.emvle.fr/rrhmbn_v2"
+    st.markdown(f"[🚀 Ouvrir le dashboard Shiny pour étude de la survie nette]({shiny_url})", unsafe_allow_html=False)
+    
+    
 
-        except Exception as e:
-            st.warning(f"Erreur lors de l'envoi : {e}")
+    # # Bouton pour envoyer le CSV via POST
+    # if st.button("📤 Etude de la survie nette (méthode Pohar-Perme) [ouverture d'une nouvelle fenêtre]"):
+    #     URL = "https://shiny-upload.emvle.fr/upload"
+    #     HEADERS = {}
+
+    #     try:
+    #         # Sauvegarde temporaire du CSV pour l'envoi
+    #         with open("hm_temp.csv", "wb") as f:
+    #             f.write(csv_data)
+    #         # Envoi du fichier
+    #         with open("hm_temp.csv", "rb") as f:
+    #             files = {"file": ("hm.csv", f)}
+    #             response = requests.post(URL, files=files, headers=HEADERS, timeout=10)
+
+    #         st.write(f"Statut : {response.status_code}")
+    #         st.write("Réponse complète du serveur :", response.text)
+
+
+
+    #         if response.status_code == 200:
+    #             st.success("CSV envoyé avec succès au serveur Shiny !")
+
+    #             # Lien vers le dashboard Shiny
+    #             shiny_url = "https://shiny.emvle.fr/rrhmbn_v2"
+    #             # st.markdown(f"[🚀 Ouvrir le dashboard Shiny pour étude de la survie nette]({shiny_url})", unsafe_allow_html=False)
+    #             # Affiche un message et ouvre automatiquement le lien dans un nouvel onglet
+    #             st.markdown(
+    #                 f"""
+    #                 <p>Le fichier a bien été transmis. Ouverture du tableau de bord Shiny...</p>
+    #                 <p><a href="{shiny_url}" target="_blank">🚀 Ouvrir le dashboard manuellement</a></p>
+    #                 <script>
+    #                     // Attendre un court délai pour laisser Streamlit actualiser la page
+    #                     setTimeout(() => {{
+    #                         window.open("{shiny_url}", "_blank");
+    #                     }}, 800);
+    #                 </script>
+    #                 """,
+    #                 unsafe_allow_html=True
+    #             )
+
+    #         else:
+    #             st.error(f"Échec de l'envoi (status {response.status_code}): {response.text}")
+
+    #     except Exception as e:
+    #         st.warning(f"Erreur lors de l'envoi : {e}")
     
        
 else:
