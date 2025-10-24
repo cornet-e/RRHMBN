@@ -216,7 +216,7 @@ icdo_choice = st.radio(
     "Filtrer selon le code morphologique (ICD-O)",
     options=["ICDO /1", "ICDO /3", "ICDO /1 et /3"],
     horizontal=True,
-    index="ICDO /1 et /3"
+    index=2
 )
 
 df_cas_global = rrhmbn_valide.copy()
