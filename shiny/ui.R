@@ -1,0 +1,49 @@
+library(shiny)
+library(plotly)
+library(DT)
+
+ui <- fluidPage(
+  titlePanel("Analyse de survie relative (Pohar-Perme)"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      h4("Chargement du fichier des patients"),
+      radioButtons(
+        "source",
+        "Choix du mode de chargement :",
+        choices = c("Chargement manuel" = "manuel",
+                    "Chargement automatique (/srv/uploads)" = "auto"),
+        selected = "auto"
+      ),
+      conditionalPanel(
+        condition = "input.source == 'manuel'",
+        fileInput("hmfile", "Importer hm.csv :", accept = ".csv")
+      ),
+      actionButton("run", "Lancer l'analyse", class = "btn-primary")
+    ),
+    
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Global", plotlyOutput("plot_global")),
+        tabPanel("Par sexe", plotlyOutput("plot_sex")),
+        tabPanel("Par sexe et âge", plotlyOutput("plot_age_sex")),
+        tabPanel("Résumé des données", DT::dataTableOutput("summary_table")),
+        tabPanel("Table survie globale", DT::dataTableOutput("table_global")),
+        tabPanel("Table survie par sexe", DT::dataTableOutput("table_sex")),
+        tabPanel("Table survie âge + sexe", DT::dataTableOutput("table_age_sex")),
+        tabPanel("Table de survie (data_lex)", DT::dataTableOutput("lex_table")),
+        tabPanel("Messages", verbatimTextOutput("log"))
+      )
+      
+      
+    )
+  ),
+  tags$script(HTML("
+  Shiny.addCustomMessageHandler('triggerRun', function(message) {
+    setTimeout(function() {
+      $('#run').click();
+    }, 500);
+  });
+"))
+  
+)
