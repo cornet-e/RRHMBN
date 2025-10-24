@@ -275,6 +275,8 @@ st.line_chart(data=df_incid, x="Année", y="Nombre de cas")
 st.markdown("---")
 st.header("🧬 Sélection d’un sous-ensemble de pathologies (HM)")
 
+hm, hm_libelle = None, None  # Initialisation pour éviter erreurs
+
 if 'rrhmbn_valide' in locals():
 
     # Méthode de classification
@@ -283,8 +285,6 @@ if 'rrhmbn_valide' in locals():
     if choix0 == "REPIH":
         choix = st.radio("Type de sélection :", ["Groupe Patho", "Sous-Type Patho"])
 
-        hm, hm_libelle = None, None  # Initialisation pour éviter erreurs
-        
         if choix == "Groupe Patho":
             # On sélectionne les libellés uniques
             libelles = rrhmbn_valide["patho_groupe_label"].dropna().unique()
