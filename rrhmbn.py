@@ -225,25 +225,58 @@ df_tab = df_tab[
     (df_tab["annee_diag"] >= global_annees_min_max[0]) &
     (df_tab["annee_diag"] <= global_annees_min_max[1])
 ]
-# Calculer les effectifs par patho_sous_type_label et sex
-tableau = df_tab.groupby(['patho_groupe_label', 'patho_sous_type_label', 'sex']).size().unstack(fill_value=0)
-
-# Renommer les colonnes pour plus de clarté
+# Calculer les effectifs par patho_groupe_label, patho_sous_type_label et sex
+tableau = df.groupby(['patho_groupe_label', 'patho_sous_type_label', 'sex']).size().unstack(fill_value=0)
 tableau = tableau.rename(columns={1: "Hommes", 2: "Femmes"})
-
-# Ajouter une colonne "Total"
 tableau['Total'] = tableau['Hommes'] + tableau['Femmes']
-
-# Réinitialiser l'index pour un joli affichage
 tableau = tableau.reset_index()
 
-# Afficher le tableau dans Streamlit
-st.subheader("📊 Nombre de cas par pathologie et sexe")
-st.dataframe(tableau)
+# Trier par groupe et pathologie
+tableau = tableau.sort_values(['patho_groupe_label', 'patho_sous_type_label'])
+
+# Supprimer la répétition des groupes pour l'affichage
+prev_group = None
+patho_groupe_col = []
+for g in tableau['patho_groupe_label']:
+    if g == prev_group:
+        patho_groupe_col.append("")
+    else:
+        patho_groupe_col.append(g)
+        prev_group = g
+tableau['Groupe'] = patho_groupe_col
+tableau = tableau[['Groupe', 'patho_sous_type_label', 'Hommes', 'Femmes', 'Total']]
+
+# Créer un dictionnaire pour assigner une couleur à chaque groupe
+group_colors = {}
+unique_groups = tableau['Groupe'].replace("", pd.NA).dropna().unique()
+colors = ["#f5f5f5", "#e0e0e0"]  # alternance clair / foncé
+for i, g in enumerate(unique_groups):
+    group_colors[g] = colors[i % len(colors)]
+
+# Fonction pour colorer les lignes selon le groupe
+def color_rows(row):
+    # Récupérer la couleur correspondant au groupe (si vide, chercher le précédent non vide)
+    grp = row['Groupe']
+    if grp == "":
+        # Chercher la couleur du dernier groupe non vide
+        grp_idx = tableau.index.get_loc(row.name)
+        for j in range(grp_idx-1, -1, -1):
+            if tableau.at[j, 'Groupe'] != "":
+                grp = tableau.at[j, 'Groupe']
+                break
+    return ['background-color: {}'.format(group_colors.get(grp, 'white'))]*len(row)
+
+# Styliser le tableau
+styled_table = tableau.style.apply(color_rows, axis=1)\
+    .set_properties(**{'text-align': 'center'})\
+    .set_table_styles([{'selector':'th', 'props':[('text-align','center'), ('background-color','#d0d0d0')]}])
+
+st.subheader("📊 Nombre de cas par pathologie et sexe (groupé par patho_groupe_label, nuances de gris)")
+st.dataframe(styled_table, height=600)
 
 # 1. Nombre total de cas
 # === Cas ===
-global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
+global_annees_min_max_2 = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
 
 
 # === Sélection du type ICD-O ===
@@ -258,8 +291,8 @@ df_cas_global = rrhmbn_valide.copy()
 
 # Filtrage par année
 df_cas_global = df_cas_global[
-    (df_cas_global["annee_diag"] >= global_annees_min_max[0]) &
-    (df_cas_global["annee_diag"] <= global_annees_min_max[1])
+    (df_cas_global["annee_diag"] >= global_annees_min_max_2[0]) &
+    (df_cas_global["annee_diag"] <= global_annees_min_max_2[1])
 ]
 
 # Filtrage par code ICD-O
