@@ -209,17 +209,37 @@ st.header("📊 Statistiques descriptives du registre")
 # 1. Nombre total de cas
 # === Cas ===
 global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
+
+
+# === Sélection du type ICD-O ===
+icdo_choice = st.radio(
+    "Filtrer selon le code morphologique (ICD-O)",
+    options=["ICDO /1", "ICDO /3", "ICDO /1 et /3"],
+    horizontal=True
+)
+
 df_cas_global = rrhmbn_valide.copy()
+
+# Filtrage par année
 df_cas_global = df_cas_global[
     (df_cas_global["annee_diag"] >= global_annees_min_max[0]) &
     (df_cas_global["annee_diag"] <= global_annees_min_max[1])
 ]
 
+# Filtrage par code ICD-O
+if icdo_choice == "ICDO /1":
+    df_cas_global = df_cas_global[df_cas_global["Code_MORPHO_Diag"].astype(str).str.endswith("1")]
+elif icdo_choice == "ICDO /3":
+    df_cas_global = df_cas_global[df_cas_global["Code_MORPHO_Diag"].astype(str).str.endswith("3")]
+# Si "ICDO /1 et /3", on garde tout
+
+# Calcul du nombre total de cas
 nb_total = len(df_cas_global)
+
 st.markdown(f"**Nombre total de cas valides :** {nb_total:,}".replace(",", " "))
 
 # 2. Nombre de cas par pathologie
-st.subheader("🦠 Nombre de cas par pathologie (Top 10)")
+st.subheader("🦠 Nombre de cas incidents par pathologie (Top 20)")
 # Récupérer le top 10
 top_pathos = df_cas_global["patho_sous_type_label"].value_counts().head(20)
 # Remettre sous forme de DataFrame, et trier pour affichage dans l'ordre décroissant
@@ -268,7 +288,7 @@ st.plotly_chart(fig)
 #st.pyplot(fig)
 
 # 5. Incidence par année
-st.subheader("📅 Incidence par année")
+st.subheader("📅 Nombre de cas incidents par année")
 incid = rrhmbn_valide["annee_diag"].value_counts().sort_index()
 df_incid = incid.reset_index()
 df_incid.columns = ["Année", "Nombre de cas"]
