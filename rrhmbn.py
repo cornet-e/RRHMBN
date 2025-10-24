@@ -211,8 +211,8 @@ st.header("📊 Statistiques descriptives du registre")
 global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
 df_cas_global = rrhmbn_valide.copy()
 df_cas_global = df_cas_global[
-    (df_cas_global["annee_diag"] >= annees_min_max[0]) &
-    (df_cas_global["annee_diag"] <= annees_min_max[1])
+    (df_cas_global["annee_diag"] >= global_annees_min_max[0]) &
+    (df_cas_global["annee_diag"] <= global_annees_min_max[1])
 ]
 
 nb_total = len(df_cas_global)
