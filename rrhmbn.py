@@ -204,9 +204,6 @@ if file is not None:
 else:
     st.info("⏳ En attente de données...")
 
-# Assurez-vous d'avoir déjà défini le dataframe `rrhmbn_valide`
-# et qu'il contient les colonnes : 'age', 'sex', 'patho_sous_type_label', 'annee_diag'
-
 st.header("📊 Statistiques descriptives du registre")
 
 # 1. Nombre total de cas
@@ -285,10 +282,12 @@ st.line_chart(data=df_incid, x="Année", y="Nombre de cas")
 st.markdown("---")
 st.header("🧬 Sélection d’un sous-ensemble de pathologies (HM)")
 
+hm, hm_libelle = None, None  # Initialisation pour éviter erreurs
+
 if 'rrhmbn_valide' in locals():
 
     # Méthode de classification
-    choix0 = st.radio("Choix de classification :", ["REPIH", "XT", "ICDO", "ADICAP"])
+    choix0 = st.radio("Choix de classification :", ["REPIH", "XT", "ICDO", "ADICAP"], index=None)
 
     if choix0 == "REPIH":
         choix = st.radio("Type de sélection :", ["Groupe Patho", "Sous-Type Patho"])
@@ -296,7 +295,7 @@ if 'rrhmbn_valide' in locals():
         if choix == "Groupe Patho":
             # On sélectionne les libellés uniques
             libelles = rrhmbn_valide["patho_groupe_label"].dropna().unique()
-            libelle_sel = st.selectbox("Sélectionnez un libellé de groupe patho :", sorted(libelles))
+            libelle_sel = st.selectbox("Sélectionnez un libellé de groupe patho :", ["Sélectionner un libellé"] + sorted(libelles))
 
             # On filtre selon le libellé
             hm = rrhmbn_valide[rrhmbn_valide["patho_groupe_label"] == libelle_sel]
@@ -305,7 +304,7 @@ if 'rrhmbn_valide' in locals():
         elif choix == "Sous-Type Patho":
             # Liste des libellés uniques de sous-types
             sous_type_labels = rrhmbn_valide["patho_sous_type_label"].dropna().unique()
-            sous_type_label_sel = st.selectbox("Sélectionnez un libellé de sous-type patho :", sorted(sous_type_labels))
+            sous_type_label_sel = st.selectbox("Sélectionnez un libellé de sous-type patho :", ["Sélectionner un libellé"] + sorted(sous_type_labels))
 
             # Filtrer les cas selon le libellé
             hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_label"] == sous_type_label_sel]
@@ -314,7 +313,7 @@ if 'rrhmbn_valide' in locals():
 
     elif choix0 == "XT":
         xt_labels = rrhmbn_valide["patho_sous_type_XT_label"].dropna().unique()
-        xt_label_sel = st.selectbox("Sélectionnez un sous-type XT patho :", sorted(xt_labels))
+        xt_label_sel = st.selectbox("Sélectionnez un sous-type XT patho :", ["Sélectionner un libellé"] + sorted(xt_labels))
         hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_XT_label"] == xt_label_sel]
         hm_libelle = hm["patho_sous_type_XT_label"].iloc[0] if not hm.empty else None
     
@@ -363,7 +362,7 @@ if st.button("Afficher le tableau de correspondance"):
 
 
 # Affichage et sauvegarde
-if 'hm' in locals() and not hm.empty:
+if hm_libelle and 'hm' in locals() and not hm.empty:
     st.success(f"✅ Vous avez sélectionné : **{hm_libelle}** ({len(hm)} cas)")
     st.dataframe(hm)
 
@@ -472,7 +471,7 @@ if 'hm' in locals() and not hm.empty:
     st.dataframe(stats_age)
 
     #### INCIDENCE ####
-    st.subheader(f"📈 Taux d'incidence (pour 100 000 habitants) - {hm_libelle}")
+    st.title(f"📈 Taux d'incidence (pour 100 000 habitants) - {hm_libelle}")
 
     ### --- 1. Chargement et préparation des données ---
     # === Cas ===
@@ -937,784 +936,781 @@ if 'hm' in locals() and not hm.empty:
 #    st.stop()
 
 
-#### SURVIE POPULATION GENERALE ####
+# #### SURVIE POPULATION GENERALE ####
 
-def courbe_survie_patient_age_depart(age_depart, sexe, annee, df_insee):
-    # Sélection du sexe
-    if sexe == 1:
-        df = df_insee["hommes"]
-    elif sexe == 2:
-        df = df_insee["femmes"]
-    else:
-        return None
+# def courbe_survie_patient_age_depart(age_depart, sexe, annee, df_insee):
+#     # Sélection du sexe
+#     if sexe == 1:
+#         df = df_insee["hommes"]
+#     elif sexe == 2:
+#         df = df_insee["femmes"]
+#     else:
+#         return None
 
-    # Nettoyage années
-    df = df[pd.to_numeric(df["Année"], errors="coerce").notna()]
-    df["Année"] = df["Année"].astype(int)
-    annee_dispo = df["Année"].unique()
-    annee_closest = min(annee_dispo, key=lambda x: abs(x - annee))
+#     # Nettoyage années
+#     df = df[pd.to_numeric(df["Année"], errors="coerce").notna()]
+#     df["Année"] = df["Année"].astype(int)
+#     annee_dispo = df["Année"].unique()
+#     annee_closest = min(annee_dispo, key=lambda x: abs(x - annee))
 
-    ligne = df[df["Année"] == annee_closest]
-    if ligne.empty:
-        return None
-    ligne = ligne.iloc[0]
+#     ligne = df[df["Année"] == annee_closest]
+#     if ligne.empty:
+#         return None
+#     ligne = ligne.iloc[0]
 
-    age_groups = [col for col in df.columns if col != "Année"]
+#     age_groups = [col for col in df.columns if col != "Année"]
 
-    # Trouver l'indice du groupe d'âge contenant age_depart
-    # Les groupes d'âge ont des labels comme "30 à 34 ans", on va extraire min âge
-    def min_age_from_label(label):
-        if label == "<1":
-            return 0
-        else:
-            # Exemple : "30 à 34 ans" -> 30
-            parts = label.split(" à ")
-            try:
-                return int(parts[0])
-            except:
-                return None
+#     # Trouver l'indice du groupe d'âge contenant age_depart
+#     # Les groupes d'âge ont des labels comme "30 à 34 ans", on va extraire min âge
+#     def min_age_from_label(label):
+#         if label == "<1":
+#             return 0
+#         else:
+#             # Exemple : "30 à 34 ans" -> 30
+#             parts = label.split(" à ")
+#             try:
+#                 return int(parts[0])
+#             except:
+#                 return None
 
-    min_ages = [min_age_from_label(grp) for grp in age_groups]
+#     min_ages = [min_age_from_label(grp) for grp in age_groups]
 
-    # Trouver l'indice de départ
-    start_idx = None
-    for i, min_a in enumerate(min_ages):
-        if min_a is not None and min_a >= age_depart:
-            start_idx = i
-            break
-    if start_idx is None:
-        return None  # âge de départ trop élevé
+#     # Trouver l'indice de départ
+#     start_idx = None
+#     for i, min_a in enumerate(min_ages):
+#         if min_a is not None and min_a >= age_depart:
+#             start_idx = i
+#             break
+#     if start_idx is None:
+#         return None  # âge de départ trop élevé
 
-    courbe = []
-    survivants = 1.0
-    # Calcul survie cumulative à partir de start_idx
-    for i in range(start_idx, len(age_groups)):
-        grp = age_groups[i]
-        taux = ligne[grp] / 1000  # taux de décès
-        courbe.append((i - start_idx, survivants))  # temps = nombre de tranches depuis âge départ
-        survivants *= (1 - taux)
+#     courbe = []
+#     survivants = 1.0
+#     # Calcul survie cumulative à partir de start_idx
+#     for i in range(start_idx, len(age_groups)):
+#         grp = age_groups[i]
+#         taux = ligne[grp] / 1000  # taux de décès
+#         courbe.append((i - start_idx, survivants))  # temps = nombre de tranches depuis âge départ
+#         survivants *= (1 - taux)
 
-    df_courbe = pd.DataFrame(courbe, columns=["temps", "survie_theorique"])
-    # ajouter info âge départ en colonne pour traçage
-    df_courbe["age_depart"] = age_depart
-    return df_courbe
+#     df_courbe = pd.DataFrame(courbe, columns=["temps", "survie_theorique"])
+#     # ajouter info âge départ en colonne pour traçage
+#     df_courbe["age_depart"] = age_depart
+#     return df_courbe
 
-def courbe_survie_moyenne_age_depart(hm, df_insee_dict, ages_depart):
-    survivances_par_age = {age: {} for age in ages_depart}
+# def courbe_survie_moyenne_age_depart(hm, df_insee_dict, ages_depart):
+#     survivances_par_age = {age: {} for age in ages_depart}
     
-    for _, row in hm.iterrows():
-        age_pat = row["age"]
-        sexe_pat = row["sex"]
-        annee_diag = row["annee_diag"]
+#     for _, row in hm.iterrows():
+#         age_pat = row["age"]
+#         sexe_pat = row["sex"]
+#         annee_diag = row["annee_diag"]
 
-        for age_dep in ages_depart:
-            # On ne calcule la courbe que si l'âge du patient est >= âge de départ (logique)
-            if age_pat >= age_dep:
-                courbe = courbe_survie_patient_age_depart(age_dep, sexe_pat, annee_diag, df_insee_dict)
-                if courbe is not None:
-                    for _, ligne in courbe.iterrows():
-                        temps = ligne["temps"]
-                        surv = ligne["survie_theorique"]
-                        survivances_par_age[age_dep].setdefault(temps, []).append(surv)
+#         for age_dep in ages_depart:
+#             # On ne calcule la courbe que si l'âge du patient est >= âge de départ (logique)
+#             if age_pat >= age_dep:
+#                 courbe = courbe_survie_patient_age_depart(age_dep, sexe_pat, annee_diag, df_insee_dict)
+#                 if courbe is not None:
+#                     for _, ligne in courbe.iterrows():
+#                         temps = ligne["temps"]
+#                         surv = ligne["survie_theorique"]
+#                         survivances_par_age[age_dep].setdefault(temps, []).append(surv)
 
-    # Calcul moyenne par âge de départ et par temps
-    result = []
-    for age_dep, data in survivances_par_age.items():
-        for temps, valeurs in data.items():
-            result.append({
-                "age_depart": age_dep,
-                "temps": temps,
-                "S_theorique_moyenne": np.mean(valeurs)
-            })
+#     # Calcul moyenne par âge de départ et par temps
+#     result = []
+#     for age_dep, data in survivances_par_age.items():
+#         for temps, valeurs in data.items():
+#             result.append({
+#                 "age_depart": age_dep,
+#                 "temps": temps,
+#                 "S_theorique_moyenne": np.mean(valeurs)
+#             })
 
-    df_result = pd.DataFrame(result)
-    return df_result
+#     df_result = pd.DataFrame(result)
+#     return df_result
 
-##### FIN DES DEF POUR SURVIE POP GENERALE #####
+# ##### FIN DES DEF POUR SURVIE POP GENERALE #####
 
 
-# Vérification des colonnes
-for col in ['fup', 'event', 'sex']:
-    if col not in hm.columns:
-        st.error(f"Colonne manquante : {col}")
+    # Vérification des colonnes
+    for col in ['fup', 'event', 'sex']:
+        if col not in hm.columns:
+            st.error(f"Colonne manquante : {col}")
+            st.stop()
+
+    st.success(f"Analyse de : **{hm_libelle}** ({len(hm)} cas)")
+
+    # Nettoyage des données
+    df = hm[['fup', 'event', 'sex']].dropna()
+    df['sex'] = df['sex'].astype(str)
+
+    # Kaplan-Meier par sexe
+    fig = go.Figure()
+    kmf = KaplanMeierFitter()
+    medians = {}
+    rmeans = {}
+    colors = {"0": "blue", "1": "red"}  # Ajuste selon les valeurs réelles
+
+    # Test log-rank
+    groups = df['sex'].unique()
+    if len(groups) != 2:
+        st.error("Il faut exactement deux groupes pour le test log-rank.")
         st.stop()
 
-st.success(f"Analyse de : **{hm_libelle}** ({len(hm)} cas)")
+    # Séparer les deux groupes
+    group0 = df[df['sex'] == groups[0]]
+    group1 = df[df['sex'] == groups[1]]
+    result = logrank_test(group0['fup'], group1['fup'], group0['event'], group1['event'])
+    p_value = result.p_value
 
-# Nettoyage des données
-df = hm[['fup', 'event', 'sex']].dropna()
-df['sex'] = df['sex'].astype(str)
-
-# Kaplan-Meier par sexe
-fig = go.Figure()
-kmf = KaplanMeierFitter()
-medians = {}
-rmeans = {}
-colors = {"0": "blue", "1": "red"}  # Ajuste selon les valeurs réelles
-
-# Test log-rank
-groups = df['sex'].unique()
-if len(groups) != 2:
-    st.error("Il faut exactement deux groupes pour le test log-rank.")
-    st.stop()
-
-# Séparer les deux groupes
-group0 = df[df['sex'] == groups[0]]
-group1 = df[df['sex'] == groups[1]]
-result = logrank_test(group0['fup'], group1['fup'], group0['event'], group1['event'])
-p_value = result.p_value
-
-# Courbes de survie
-for sex in groups:
-    subset = df[df['sex'] == sex]
-    kmf.fit(subset['fup'], subset['event'], label=f"Sexe {sex}")
-    medians[sex] = kmf.median_survival_time_
-    rmeans[sex] = kmf.conditional_time_to_event_.mean()
-    
-    fig.add_trace(go.Scatter(
-        x=kmf.survival_function_.index,
-        y=kmf.survival_function_[f"Sexe {sex}"],
-        mode='lines',
-        name=f"Sexe {sex}",
-        line=dict(color=colors.get(sex, 'gray')),
-    ))
-
-    # IC (bande)
-    fig.add_trace(go.Scatter(
-        x=kmf.confidence_interval_.index,
-        y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
-        mode='lines',
-        line=dict(width=0),
-        showlegend=False
-    ))
-    fig.add_trace(go.Scatter(
-        x=kmf.confidence_interval_.index,
-        y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
-        fill='tonexty',
-        fillcolor='rgba(0,0,0,0.1)',
-        mode='lines',
-        line=dict(width=0),
-        name=f"IC 95% {sex}"
-    ))
-
-# Annotations : médiane ou moyenne restreinte
-annotations = []
-for sex in groups:
-    label = f"Sexe {sex}"
-    if not np.isnan(medians[sex]):
-        annotations.append(dict(
-            x=medians[sex], y=0.1,
-            text=f"Médiane : {round(medians[sex], 1)}",
-            showarrow=True, arrowhead=1, ax=0, ay=-40,
-            font=dict(color=colors.get(sex, "black"))
-        ))
-    else:
-        annotations.append(dict(
-            x=50, y=0.2 if sex == groups[0] else 0.1,
-            text=f"Moyenne restreinte : {round(rmeans[sex], 1)}",
-            showarrow=False,
-            font=dict(color=colors.get(sex, "black"))
+    # Courbes de survie
+    for sex in groups:
+        subset = df[df['sex'] == sex]
+        kmf.fit(subset['fup'], subset['event'], label=f"Sexe {sex}")
+        medians[sex] = kmf.median_survival_time_
+        rmeans[sex] = kmf.conditional_time_to_event_.mean()
+        
+        fig.add_trace(go.Scatter(
+            x=kmf.survival_function_.index,
+            y=kmf.survival_function_[f"Sexe {sex}"],
+            mode='lines',
+            name=f"Sexe {sex}",
+            line=dict(color=colors.get(sex, 'gray')),
         ))
 
-# Affichage
-fig.update_layout(
-    title=f"{hm_libelle} - Survie selon le sexe<br><sup>Test de log-rank p = {p_value:.3e}</sup>",
-    xaxis_title="Temps (mois)",
-    yaxis_title="Probabilité de survie",
-    yaxis=dict(range=[0, 1]),
-    annotations=annotations,
-    template="plotly_white"
-)
+        # IC (bande)
+        fig.add_trace(go.Scatter(
+            x=kmf.confidence_interval_.index,
+            y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
+            mode='lines',
+            line=dict(width=0),
+            showlegend=False
+        ))
+        fig.add_trace(go.Scatter(
+            x=kmf.confidence_interval_.index,
+            y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
+            fill='tonexty',
+            fillcolor='rgba(0,0,0,0.1)',
+            mode='lines',
+            line=dict(width=0),
+            name=f"IC 95% {sex}"
+        ))
 
-st.plotly_chart(fig, use_container_width=True)
+    # Annotations : médiane ou moyenne restreinte
+    annotations = []
+    for sex in groups:
+        label = f"Sexe {sex}"
+        if not np.isnan(medians[sex]):
+            annotations.append(dict(
+                x=medians[sex], y=0.1,
+                text=f"Médiane : {round(medians[sex], 1)}",
+                showarrow=True, arrowhead=1, ax=0, ay=-40,
+                font=dict(color=colors.get(sex, "black"))
+            ))
+        else:
+            annotations.append(dict(
+                x=50, y=0.2 if sex == groups[0] else 0.1,
+                text=f"Moyenne restreinte : {round(rmeans[sex], 1)}",
+                showarrow=False,
+                font=dict(color=colors.get(sex, "black"))
+            ))
 
-### tracé courbe survie pop générale
-df_insee = {
-    "hommes": pd.read_excel("fm_t67_clean.xlsx", sheet_name="T67h"),
-    "femmes": pd.read_excel("fm_t67_clean.xlsx", sheet_name="T67f")
-}
+    # Affichage
+    fig.update_layout(
+        title=f"{hm_libelle} - Survie selon le sexe<br><sup>Test de log-rank p = {p_value:.3e}</sup>",
+        xaxis_title="Temps (mois)",
+        yaxis_title="Probabilité de survie",
+        yaxis=dict(range=[0, 1]),
+        annotations=annotations,
+        template="plotly_white"
+    )
 
-ages_depart = [30, 45, 60, 75]
+    st.plotly_chart(fig, use_container_width=True)
 
-# Assure-toi que ton dataframe hm contient au moins 'age', 'sex', 'annee_diag'
-# Exemple d'appel :
-df_survie_moyenne = courbe_survie_moyenne_age_depart(hm, df_insee, ages_depart)
+    # ### tracé courbe survie pop générale
+    # df_insee = {
+    #     "hommes": pd.read_excel("fm_t67_clean.xlsx", sheet_name="T67h"),
+    #     "femmes": pd.read_excel("fm_t67_clean.xlsx", sheet_name="T67f")
+    # }
 
-# Tracé
-fig = go.Figure()
+    # ages_depart = [30, 45, 60, 75]
 
-colors = {30:"blue", 45: "green", 60: "pink", 75: "purple"}
-colors_sex = {"1": "red", "2": "gray"}  # adapte selon les valeurs réelles de ta variable 'sex'
+    # # Assure-toi que ton dataframe hm contient au moins 'age', 'sex', 'annee_diag'
+    # # Exemple d'appel :
+    # df_survie_moyenne = courbe_survie_moyenne_age_depart(hm, df_insee, ages_depart)
 
+    # # Tracé
+    # fig = go.Figure()
 
-for age_dep in ages_depart:
-    df_sub = df_survie_moyenne[df_survie_moyenne["age_depart"] == age_dep]
-    fig.add_trace(go.Scatter(
-        x=df_sub["temps"] * 5 * 12,  # conversion tranches en mois (5 ans * 12 mois)
-        y=df_sub["S_theorique_moyenne"],
-        mode="lines+markers",
-        name=f"Survie théorique dès {age_dep} ans",
-        line=dict(color=colors.get(age_dep, "gray"), dash="dot")
-    ))
-
-# Ici tu peux ajouter ta courbe Kaplan-Meier si tu veux, par ex :
-# Courbes de survie
-for sex in groups:
-    subset = df[df['sex'] == sex]
-    kmf.fit(subset['fup'], subset['event'], label=f"Sexe {sex}")
-    medians[sex] = kmf.median_survival_time_
-    rmeans[sex] = kmf.conditional_time_to_event_.mean()
-    
-    fig.add_trace(go.Scatter(
-        x=kmf.survival_function_.index,
-        y=kmf.survival_function_[f"Sexe {sex}"],
-        mode='lines',
-        name=f"Sexe {sex}",
-        line=dict(color=colors_sex.get(sex, 'gray')),
-    ))
-
-    # IC (bande)
-    fig.add_trace(go.Scatter(
-        x=kmf.confidence_interval_.index,
-        y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
-        mode='lines',
-        line=dict(width=0),
-        showlegend=False
-    ))
-    fig.add_trace(go.Scatter(
-        x=kmf.confidence_interval_.index,
-        y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
-        fill='tonexty',
-        fillcolor='rgba(0,0,0,0.1)',
-        mode='lines',
-        line=dict(width=0),
-        name=f"IC 95% {sex}"
-    ))
-
-fig.update_layout(
-    title=f"{hm_libelle} - Survie selon le sexe<br><sup>Test de log-rank p = {p_value:.3e}</sup>",
-    xaxis_title="Temps (mois)",
-    yaxis_title="Probabilité de survie",
-    yaxis=dict(range=[0, 1]),
-    template="plotly_white"
-)
-
-st.plotly_chart(fig, use_container_width=True)
+    # colors = {30:"blue", 45: "green", 60: "pink", 75: "purple"}
+    # colors_sex = {"1": "red", "2": "gray"}  # adapte selon les valeurs réelles de ta variable 'sex'
 
 
-### Analyse Survie par sexe et groupe age ###
+    # for age_dep in ages_depart:
+    #     df_sub = df_survie_moyenne[df_survie_moyenne["age_depart"] == age_dep]
+    #     fig.add_trace(go.Scatter(
+    #         x=df_sub["temps"] * 5 * 12,  # conversion tranches en mois (5 ans * 12 mois)
+    #         y=df_sub["S_theorique_moyenne"],
+    #         mode="lines+markers",
+    #         name=f"Survie théorique dès {age_dep} ans",
+    #         line=dict(color=colors.get(age_dep, "gray"), dash="dot")
+    #     ))
 
-df2 = hm[['fup', 'event', 'sex', 'groupe_age']].dropna()
-df2['sex'] = df2['sex'].astype(str)
-df2['groupe_age'] = df2['groupe_age'].astype(str)
+    # # Ici tu peux ajouter ta courbe Kaplan-Meier si tu veux, par ex :
+    # # Courbes de survie
+    # for sex in groups:
+    #     subset = df[df['sex'] == sex]
+    #     kmf.fit(subset['fup'], subset['event'], label=f"Sexe {sex}")
+    #     medians[sex] = kmf.median_survival_time_
+    #     rmeans[sex] = kmf.conditional_time_to_event_.mean()
+        
+    #     fig.add_trace(go.Scatter(
+    #         x=kmf.survival_function_.index,
+    #         y=kmf.survival_function_[f"Sexe {sex}"],
+    #         mode='lines',
+    #         name=f"Sexe {sex}",
+    #         line=dict(color=colors_sex.get(sex, 'gray')),
+    #     ))
 
-groupes_age = df2['groupe_age'].unique()
-colors = {"0": "blue", "1": "red"}
+    #     # IC (bande)
+    #     fig.add_trace(go.Scatter(
+    #         x=kmf.confidence_interval_.index,
+    #         y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
+    #         mode='lines',
+    #         line=dict(width=0),
+    #         showlegend=False
+    #     ))
+    #     fig.add_trace(go.Scatter(
+    #         x=kmf.confidence_interval_.index,
+    #         y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
+    #         fill='tonexty',
+    #         fillcolor='rgba(0,0,0,0.1)',
+    #         mode='lines',
+    #         line=dict(width=0),
+    #         name=f"IC 95% {sex}"
+    #     ))
 
-# Création d'une figure avec un subplot par groupe d'âge (arrangé en 2 colonnes max)
-cols = 2
-rows = (len(groupes_age) + 1) // cols
-fig2 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Groupe d'âge: {ga}" for ga in groupes_age])
+    # fig.update_layout(
+    #     title=f"{hm_libelle} - Survie selon le sexe<br><sup>Test de log-rank p = {p_value:.3e}</sup>",
+    #     xaxis_title="Temps (mois)",
+    #     yaxis_title="Probabilité de survie",
+    #     yaxis=dict(range=[0, 1]),
+    #     template="plotly_white"
+    # )
 
-for i, ga in enumerate(groupes_age):
-    subset = df2[df2['groupe_age'] == ga]
-    if len(subset) == 0:
-        continue
+    # st.plotly_chart(fig, use_container_width=True)
 
-    kmf = KaplanMeierFitter()
+    ### Analyse Survie par sexe et groupe age ###
 
-    for sex in subset['sex'].unique():
-        sex_subset = subset[subset['sex'] == sex]
-        if len(sex_subset) == 0:
+    df2 = hm[['fup', 'event', 'sex', 'groupe_age']].dropna()
+    df2['sex'] = df2['sex'].astype(str)
+    df2['groupe_age'] = df2['groupe_age'].astype(str)
+
+    groupes_age = df2['groupe_age'].unique()
+    colors = {"0": "blue", "1": "red"}
+
+    # Création d'une figure avec un subplot par groupe d'âge (arrangé en 2 colonnes max)
+    cols = 2
+    rows = (len(groupes_age) + 1) // cols
+    fig2 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Groupe d'âge: {ga}" for ga in groupes_age])
+
+    for i, ga in enumerate(groupes_age):
+        subset = df2[df2['groupe_age'] == ga]
+        if len(subset) == 0:
             continue
 
-        kmf.fit(sex_subset['fup'], sex_subset['event'], label=f"Sexe {sex}")
+        kmf = KaplanMeierFitter()
 
-        # Position subplot
+        for sex in subset['sex'].unique():
+            sex_subset = subset[subset['sex'] == sex]
+            if len(sex_subset) == 0:
+                continue
+
+            kmf.fit(sex_subset['fup'], sex_subset['event'], label=f"Sexe {sex}")
+
+            # Position subplot
+            row = i // cols + 1
+            col = i % cols + 1
+
+            fig2.add_trace(
+                go.Scatter(
+                    x=kmf.survival_function_.index,
+                    y=kmf.survival_function_[f"Sexe {sex}"],
+                    mode='lines',
+                    name=f"Sexe {sex}",
+                    line=dict(color=colors.get(sex, 'gray'))
+                ),
+                row=row, col=col
+            )
+
+            # IC
+            fig2.add_trace(
+                go.Scatter(
+                    x=kmf.confidence_interval_.index,
+                    y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
+                    mode='lines',
+                    line=dict(width=0),
+                    showlegend=False
+                ),
+                row=row, col=col
+            )
+            fig2.add_trace(
+                go.Scatter(
+                    x=kmf.confidence_interval_.index,
+                    y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
+                    fill='tonexty',
+                    fillcolor='rgba(0,0,0,0.1)',
+                    mode='lines',
+                    line=dict(width=0),
+                    name=f"IC 95% {sex}",
+                    showlegend=False
+                ),
+                row=row, col=col
+            )
+
+    fig2.update_layout(
+        height=300 * rows, width=700,
+        title_text=f"{hm_libelle} - Survie selon sexe ET groupe d'âge",
+        template="plotly_white"
+    )
+
+    st.plotly_chart(fig2, use_container_width=True)
+
+    ### Survie par sexe et groupe d'âge "0-25 ans", "26-50 ans", "51-75 ans", "75 ans+"
+    #  survie par sexe et groupe age calculé
+
+    bins = [-np.inf, 25, 50, 75, np.inf]
+    labels = ["0-25 ans", "26-50 ans", "51-75 ans", "75 ans+"]
+
+    hm3 = hm.copy()
+
+    hm3['grp_age'] = pd.cut(hm3['age'], bins=bins, labels=labels, right=False)
+
+    df3 = hm3[['fup', 'event', 'sex', 'grp_age']].dropna()
+    df3['sex'] = df3['sex'].astype(str)
+    df3['grp_age'] = df3['grp_age'].astype(str)
+
+
+    p_values = []
+
+    for grp in df3['grp_age'].unique():
+        grp_data = df3[df3['grp_age'] == grp]
+        sexes = grp_data['sex'].unique()
+        if len(sexes) > 1:
+            result = logrank_test(
+                grp_data[grp_data['sex'] == sexes[0]]['fup'],
+                grp_data[grp_data['sex'] == sexes[1]]['fup'],
+                grp_data[grp_data['sex'] == sexes[0]]['event'],
+                grp_data[grp_data['sex'] == sexes[1]]['event']
+            )
+            p_values.append((grp, result.p_value))
+        else:
+            p_values.append((grp, None))
+
+    # Affichage des p-values
+    st.write("### P-values log-rank par groupe d'âge")
+    pval_df = pd.DataFrame(p_values, columns=['Groupe d\'âge', 'P-value'])
+    st.table(pval_df)
+
+    groupes_age = df3['grp_age'].unique()
+    colors = {"0": "blue", "1": "red"}  # Ajuste si tes valeurs sex diffèrent
+    line_types = {"0": "solid", "1": "dash"}
+
+    cols = 2
+    rows = (len(groupes_age) + 1) // cols
+    fig3 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Groupe d'âge: {ga}" for ga in groupes_age])
+
+    for i, ga in enumerate(groupes_age):
+        subset = df3[df3['grp_age'] == ga]
+        if len(subset) == 0:
+            continue
+
+        kmf = KaplanMeierFitter()
+
         row = i // cols + 1
         col = i % cols + 1
 
-        fig2.add_trace(
-            go.Scatter(
-                x=kmf.survival_function_.index,
-                y=kmf.survival_function_[f"Sexe {sex}"],
-                mode='lines',
-                name=f"Sexe {sex}",
-                line=dict(color=colors.get(sex, 'gray'))
-            ),
-            row=row, col=col
-        )
+        for sex in subset['sex'].unique():
+            sex_subset = subset[subset['sex'] == sex]
+            if len(sex_subset) == 0:
+                continue
 
-        # IC
-        fig2.add_trace(
-            go.Scatter(
-                x=kmf.confidence_interval_.index,
-                y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
-                mode='lines',
-                line=dict(width=0),
-                showlegend=False
-            ),
-            row=row, col=col
-        )
-        fig2.add_trace(
-            go.Scatter(
-                x=kmf.confidence_interval_.index,
-                y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
-                fill='tonexty',
-                fillcolor='rgba(0,0,0,0.1)',
-                mode='lines',
-                line=dict(width=0),
-                name=f"IC 95% {sex}",
-                showlegend=False
-            ),
-            row=row, col=col
-        )
+            kmf.fit(sex_subset['fup'], sex_subset['event'], label=f"Sexe {sex}")
 
-fig2.update_layout(
-    height=300 * rows, width=700,
-    title_text=f"{hm_libelle} - Survie selon sexe ET groupe d'âge",
-    template="plotly_white"
-)
+            fig3.add_trace(
+                go.Scatter(
+                    x=kmf.survival_function_.index,
+                    y=kmf.survival_function_[f"Sexe {sex}"],
+                    mode='lines',
+                    name=f"Sexe {sex} - {ga}",
+                    line=dict(color=colors.get(sex, "gray"), dash=line_types.get(sex, "solid"))
+                ),
+                row=row, col=col
+            )
 
-st.plotly_chart(fig2, use_container_width=True)
+            # IC
+            fig3.add_trace(
+                go.Scatter(
+                    x=kmf.confidence_interval_.index,
+                    y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
+                    mode='lines',
+                    line=dict(width=0),
+                    showlegend=False
+                ),
+                row=row, col=col
+            )
+            fig3.add_trace(
+                go.Scatter(
+                    x=kmf.confidence_interval_.index,
+                    y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
+                    fill='tonexty',
+                    fillcolor='rgba(0,0,0,0.1)',
+                    mode='lines',
+                    line=dict(width=0),
+                    name=f"IC 95% {sex}",
+                    showlegend=False
+                ),
+                row=row, col=col
+            )
 
-### Survie par sexe et groupe d'âge "0-25 ans", "26-50 ans", "51-75 ans", "75 ans+"
-#  survie par sexe et groupe age calculé
+    fig3.update_layout(
+        height=300 * rows, width=700,
+        title_text=f"{hm_libelle} - Survie selon sexe ET groupe d'âge (tranches définies)",
+        template="plotly_white"
+    )
 
-bins = [-np.inf, 25, 50, 75, np.inf]
-labels = ["0-25 ans", "26-50 ans", "51-75 ans", "75 ans+"]
+    st.plotly_chart(fig3, use_container_width=True)
 
-hm3 = hm.copy()
+    ### Survie par sexe et Quartiles calculés d'âge
+    # Calculer les quartiles de la colonne 'age'
+    hm4 = hm.copy()
+    # Calculer les quartiles uniques
+    quartiles_hm4 = sorted(hm4['age'].quantile([0, 0.25, 0.5, 0.75, 1.0]).unique())
 
-hm3['grp_age'] = pd.cut(hm3['age'], bins=bins, labels=labels, right=False)
+    # Vérifier qu'on a bien au moins 4 tranches
+    if len(quartiles_hm4) >= 4:
+        # Créer les labels adaptés
+        labels = []
+        for i in range(1, len(quartiles_hm4)):
+            if i == 1:
+                labels.append(f"Q{i} - ≤ {round(quartiles_hm4[i])} ans")
+            elif i == len(quartiles_hm4)-1:
+                labels.append(f"Q{i} - > {round(quartiles_hm4[i-1])} ans")
+            else:
+                labels.append(f"Q{i} - {round(quartiles_hm4[i-1])} - {round(quartiles_hm4[i])} ans")
 
-df3 = hm3[['fup', 'event', 'sex', 'grp_age']].dropna()
-df3['sex'] = df3['sex'].astype(str)
-df3['grp_age'] = df3['grp_age'].astype(str)
-
-
-p_values = []
-
-for grp in df3['grp_age'].unique():
-    grp_data = df3[df3['grp_age'] == grp]
-    sexes = grp_data['sex'].unique()
-    if len(sexes) > 1:
-        result = logrank_test(
-            grp_data[grp_data['sex'] == sexes[0]]['fup'],
-            grp_data[grp_data['sex'] == sexes[1]]['fup'],
-            grp_data[grp_data['sex'] == sexes[0]]['event'],
-            grp_data[grp_data['sex'] == sexes[1]]['event']
-        )
-        p_values.append((grp, result.p_value))
+        # Découper selon les bornes uniques
+        hm4['grp_age'] = pd.cut(
+            hm4['age'],
+            bins=quartiles_hm4,
+            labels=labels,
+            include_lowest=True,
+            right=False
+        ).astype(str)
     else:
-        p_values.append((grp, None))
+        st.warning("Les quantiles d’âge ne permettent pas une division en quartiles distincts.")
 
-# Affichage des p-values
-st.write("### P-values log-rank par groupe d'âge")
-pval_df = pd.DataFrame(p_values, columns=['Groupe d\'âge', 'P-value'])
-st.table(pval_df)
+    # Préparer les données pour survie
+    df4 = hm4[['fup', 'event', 'sex', 'grp_age']].dropna()
+    df4['sex'] = df4['sex'].astype(str)
+    df4 = df4[df4['grp_age'] != 'nan']
 
-groupes_age = df3['grp_age'].unique()
-colors = {"0": "blue", "1": "red"}  # Ajuste si tes valeurs sex diffèrent
-line_types = {"0": "solid", "1": "dash"}
+    # Calculer p-values log-rank par groupe d'âge (quartile)
+    p_values_quartiles = []
+    for grp in df4['grp_age'].unique():
+        grp_data = df4[df4['grp_age'] == grp]
+        sexes = grp_data['sex'].unique()
+        if len(sexes) > 1:
+            result = logrank_test(
+                grp_data[grp_data['sex'] == sexes[0]]['fup'],
+                grp_data[grp_data['sex'] == sexes[1]]['fup'],
+                grp_data[grp_data['sex'] == sexes[0]]['event'],
+                grp_data[grp_data['sex'] == sexes[1]]['event']
+            )
+            p_values_quartiles.append((grp, result.p_value))
+        else:
+            p_values_quartiles.append((grp, None))
 
-cols = 2
-rows = (len(groupes_age) + 1) // cols
-fig3 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Groupe d'âge: {ga}" for ga in groupes_age])
+    pval_quart_df = pd.DataFrame(p_values_quartiles, columns=["Groupe d'âge (Quartile)", "P-value"])
+    st.write("### P-values log-rank par groupe d'âge (Quartiles)")
+    st.table(pval_quart_df)
 
-for i, ga in enumerate(groupes_age):
-    subset = df3[df3['grp_age'] == ga]
-    if len(subset) == 0:
-        continue
+    # Tracer les courbes Kaplan-Meier facettées sur les groupes d'âge (quartiles)
+    groupes_age = df4['grp_age'].unique()
+    colors = {"0": "blue", "1": "red"}  # Ajuster selon codage sex
+    line_types = {"0": "solid", "1": "dash"}
+
+    cols = 2
+    rows = (len(groupes_age) + 1) // cols
+    fig4 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Groupe d'âge: {ga}" for ga in groupes_age])
 
     kmf = KaplanMeierFitter()
 
-    row = i // cols + 1
-    col = i % cols + 1
-
-    for sex in subset['sex'].unique():
-        sex_subset = subset[subset['sex'] == sex]
-        if len(sex_subset) == 0:
+    for i, ga in enumerate(groupes_age):
+        subset = df4[df4['grp_age'] == ga]
+        if len(subset) == 0:
             continue
 
-        kmf.fit(sex_subset['fup'], sex_subset['event'], label=f"Sexe {sex}")
+        row = i // cols + 1
+        col = i % cols + 1
 
-        fig3.add_trace(
-            go.Scatter(
-                x=kmf.survival_function_.index,
-                y=kmf.survival_function_[f"Sexe {sex}"],
-                mode='lines',
-                name=f"Sexe {sex} - {ga}",
-                line=dict(color=colors.get(sex, "gray"), dash=line_types.get(sex, "solid"))
-            ),
-            row=row, col=col
-        )
+        for sex in subset['sex'].unique():
+            sex_subset = subset[subset['sex'] == sex]
+            if len(sex_subset) == 0:
+                continue
 
-        # IC
-        fig3.add_trace(
-            go.Scatter(
-                x=kmf.confidence_interval_.index,
-                y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
-                mode='lines',
-                line=dict(width=0),
-                showlegend=False
-            ),
-            row=row, col=col
-        )
-        fig3.add_trace(
-            go.Scatter(
-                x=kmf.confidence_interval_.index,
-                y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
-                fill='tonexty',
-                fillcolor='rgba(0,0,0,0.1)',
-                mode='lines',
-                line=dict(width=0),
-                name=f"IC 95% {sex}",
-                showlegend=False
-            ),
-            row=row, col=col
-        )
+            kmf.fit(sex_subset['fup'], sex_subset['event'], label=f"Sexe {sex}")
 
-fig3.update_layout(
-    height=300 * rows, width=700,
-    title_text=f"{hm_libelle} - Survie selon sexe ET groupe d'âge (tranches définies)",
-    template="plotly_white"
-)
+            fig4.add_trace(
+                go.Scatter(
+                    x=kmf.survival_function_.index,
+                    y=kmf.survival_function_[f"Sexe {sex}"],
+                    mode='lines',
+                    name=f"Sexe {sex} - {ga}",
+                    line=dict(color=colors.get(sex, "gray"), dash=line_types.get(sex, "solid"))
+                ),
+                row=row, col=col
+            )
 
-st.plotly_chart(fig3, use_container_width=True)
+            # IC
+            fig4.add_trace(
+                go.Scatter(
+                    x=kmf.confidence_interval_.index,
+                    y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
+                    mode='lines',
+                    line=dict(width=0),
+                    showlegend=False
+                ),
+                row=row, col=col
+            )
+            fig4.add_trace(
+                go.Scatter(
+                    x=kmf.confidence_interval_.index,
+                    y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
+                    fill='tonexty',
+                    fillcolor='rgba(0,0,0,0.1)',
+                    mode='lines',
+                    line=dict(width=0),
+                    showlegend=False
+                ),
+                row=row, col=col
+            )
 
-### Survie par sexe et Quartiles calculés d'âge
-# Calculer les quartiles de la colonne 'age'
-hm4 = hm.copy()
-# Calculer les quartiles uniques
-quartiles_hm4 = sorted(hm4['age'].quantile([0, 0.25, 0.5, 0.75, 1.0]).unique())
+    fig4.update_layout(
+        height=300 * rows, width=700,
+        title_text=f"{hm_libelle} - Survie selon sexe ET groupe d'âge par quartiles",
+        template="plotly_white"
+    )
 
-# Vérifier qu'on a bien au moins 4 tranches
-if len(quartiles_hm4) >= 4:
-    # Créer les labels adaptés
-    labels = []
-    for i in range(1, len(quartiles_hm4)):
-        if i == 1:
-            labels.append(f"Q{i} - ≤ {round(quartiles_hm4[i])} ans")
-        elif i == len(quartiles_hm4)-1:
-            labels.append(f"Q{i} - > {round(quartiles_hm4[i-1])} ans")
+    st.plotly_chart(fig4, use_container_width=True)
+
+    ##### SELON SEX, GROUPE PAR ANNE DIAG (1997-2009 versus 2010-2022) ####
+
+    # Créer une colonne 'grp_annee_diag'
+    hm5 = hm.copy()
+    hm5['grp_annee_diag'] = np.where(hm5['annee_diag'] >= 2010, "2010-2022", "1997-2009")
+
+    # Préparer les données
+    df5 = hm5[['fup', 'event', 'sex', 'grp_annee_diag']].dropna()
+    df5['sex'] = df5['sex'].astype(str)
+    df5['grp_annee_diag'] = df5['grp_annee_diag'].astype(str)
+
+    # Calcul des p-values log-rank par groupe
+    from lifelines.statistics import logrank_test
+
+    p_values_diag = []
+    for grp in df5['grp_annee_diag'].unique():
+        grp_data = df5[df5['grp_annee_diag'] == grp]
+        sexes = grp_data['sex'].unique()
+        if len(sexes) > 1:
+            result = logrank_test(
+                grp_data[grp_data['sex'] == sexes[0]]['fup'],
+                grp_data[grp_data['sex'] == sexes[1]]['fup'],
+                grp_data[grp_data['sex'] == sexes[0]]['event'],
+                grp_data[grp_data['sex'] == sexes[1]]['event']
+            )
+            p_values_diag.append((grp, result.p_value))
         else:
-            labels.append(f"Q{i} - {round(quartiles_hm4[i-1])} - {round(quartiles_hm4[i])} ans")
+            p_values_diag.append((grp, None))
 
-    # Découper selon les bornes uniques
-    hm4['grp_age'] = pd.cut(
-        hm4['age'],
-        bins=quartiles_hm4,
-        labels=labels,
-        include_lowest=True,
-        right=False
-    ).astype(str)
-else:
-    st.warning("Les quantiles d’âge ne permettent pas une division en quartiles distincts.")
+    pval_diag_df = pd.DataFrame(p_values_diag, columns=["Groupe d'année diagnostic", "P-value"])
+    st.write("### P-values log-rank selon le sexe par période de diagnostic")
+    st.table(pval_diag_df)
 
-# Préparer les données pour survie
-df4 = hm4[['fup', 'event', 'sex', 'grp_age']].dropna()
-df4['sex'] = df4['sex'].astype(str)
-df4 = df4[df4['grp_age'] != 'nan']
+    groupes_diag = df5['grp_annee_diag'].unique()
+    cols = 2
+    rows = (len(groupes_diag) + 1) // cols
+    fig5 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Période: {g}" for g in groupes_diag])
 
-# Calculer p-values log-rank par groupe d'âge (quartile)
-p_values_quartiles = []
-for grp in df4['grp_age'].unique():
-    grp_data = df4[df4['grp_age'] == grp]
-    sexes = grp_data['sex'].unique()
-    if len(sexes) > 1:
-        result = logrank_test(
-            grp_data[grp_data['sex'] == sexes[0]]['fup'],
-            grp_data[grp_data['sex'] == sexes[1]]['fup'],
-            grp_data[grp_data['sex'] == sexes[0]]['event'],
-            grp_data[grp_data['sex'] == sexes[1]]['event']
-        )
-        p_values_quartiles.append((grp, result.p_value))
-    else:
-        p_values_quartiles.append((grp, None))
+    kmf = KaplanMeierFitter()
 
-pval_quart_df = pd.DataFrame(p_values_quartiles, columns=["Groupe d'âge (Quartile)", "P-value"])
-st.write("### P-values log-rank par groupe d'âge (Quartiles)")
-st.table(pval_quart_df)
+    for i, grp in enumerate(groupes_diag):
+        subset = df5[df5['grp_annee_diag'] == grp]
+        row = i // cols + 1
+        col = i % cols + 1
 
-# Tracer les courbes Kaplan-Meier facettées sur les groupes d'âge (quartiles)
-groupes_age = df4['grp_age'].unique()
-colors = {"0": "blue", "1": "red"}  # Ajuster selon codage sex
-line_types = {"0": "solid", "1": "dash"}
+        for sex in subset['sex'].unique():
+            sex_subset = subset[subset['sex'] == sex]
+            kmf.fit(sex_subset['fup'], sex_subset['event'], label=f"{'Homme' if sex == '1' else 'Femme'}")
+            fig5.add_trace(
+                go.Scatter(
+                    x=kmf.survival_function_.index,
+                    y=kmf.survival_function_[kmf._label],
+                    mode='lines',
+                    name=f"{kmf._label} - {grp}",
+                    line=dict(color="blue" if sex == "1" else "red",
+                            dash="solid" if sex == "1" else "dash")
+                ),
+                row=row, col=col
+            )
+            # Ajouter les intervalles de confiance
+            fig5.add_trace(
+                go.Scatter(
+                    x=kmf.confidence_interval_.index,
+                    y=kmf.confidence_interval_[kmf._label + "_upper_0.95"],
+                    mode='lines', line=dict(width=0), showlegend=False
+                ),
+                row=row, col=col
+            )
+            fig5.add_trace(
+                go.Scatter(
+                    x=kmf.confidence_interval_.index,
+                    y=kmf.confidence_interval_[kmf._label + "_lower_0.95"],
+                    fill='tonexty', fillcolor='rgba(0,0,0,0.1)',
+                    mode='lines', line=dict(width=0), showlegend=False
+                ),
+                row=row, col=col
+            )
 
-cols = 2
-rows = (len(groupes_age) + 1) // cols
-fig4 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Groupe d'âge: {ga}" for ga in groupes_age])
+    fig5.update_layout(
+        height=300 * rows, width=800,
+        title_text=f"{hm_libelle} - Survie selon sexe et période de diagnostic",
+        template="plotly_white"
+    )
 
-kmf = KaplanMeierFitter()
+    st.plotly_chart(fig5, use_container_width=True)
 
-for i, ga in enumerate(groupes_age):
-    subset = df4[df4['grp_age'] == ga]
-    if len(subset) == 0:
-        continue
+    ##### SELON ANNE DIAG (1997-2009 versus 2010-2022) PAR SEXE ####
 
-    row = i // cols + 1
-    col = i % cols + 1
+    # Créer une colonne 'grp_annee_diag' selon les années de diagnostic
+    hm6 = hm.copy()
+    hm6['grp_annee_diag'] = np.where(hm6['annee_diag'] >= 2010, "2010-2022", "1997-2009")
 
-    for sex in subset['sex'].unique():
-        sex_subset = subset[subset['sex'] == sex]
-        if len(sex_subset) == 0:
-            continue
+    # Nettoyage et transformation
+    df6 = hm5[['fup', 'event', 'sex', 'grp_annee_diag']].dropna()
+    df6['sex'] = df6['sex'].astype(str)
+    df6['grp_annee_diag'] = df6['grp_annee_diag'].astype(str)
 
-        kmf.fit(sex_subset['fup'], sex_subset['event'], label=f"Sexe {sex}")
+    # P-values log-rank par sexe
+    from lifelines.statistics import logrank_test
 
-        fig4.add_trace(
-            go.Scatter(
-                x=kmf.survival_function_.index,
-                y=kmf.survival_function_[f"Sexe {sex}"],
-                mode='lines',
-                name=f"Sexe {sex} - {ga}",
-                line=dict(color=colors.get(sex, "gray"), dash=line_types.get(sex, "solid"))
-            ),
-            row=row, col=col
-        )
+    p_values_diag_sex = []
+    for sexe in df6['sex'].unique():
+        sexe_data = df6[df6['sex'] == sexe]
+        groupes = sexe_data['grp_annee_diag'].unique()
+        if len(groupes) > 1:
+            result = logrank_test(
+                sexe_data[sexe_data['grp_annee_diag'] == groupes[0]]['fup'],
+                sexe_data[sexe_data['grp_annee_diag'] == groupes[1]]['fup'],
+                sexe_data[sexe_data['grp_annee_diag'] == groupes[0]]['event'],
+                sexe_data[sexe_data['grp_annee_diag'] == groupes[1]]['event']
+            )
+            p_values_diag_sex.append((sexe, result.p_value))
+        else:
+            p_values_diag_sex.append((sexe, None))
 
-        # IC
-        fig4.add_trace(
-            go.Scatter(
-                x=kmf.confidence_interval_.index,
-                y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
-                mode='lines',
-                line=dict(width=0),
-                showlegend=False
-            ),
-            row=row, col=col
-        )
-        fig4.add_trace(
-            go.Scatter(
-                x=kmf.confidence_interval_.index,
-                y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
-                fill='tonexty',
-                fillcolor='rgba(0,0,0,0.1)',
-                mode='lines',
-                line=dict(width=0),
-                showlegend=False
-            ),
-            row=row, col=col
-        )
+    pval_diag_sex_df = pd.DataFrame(p_values_diag_sex, columns=["Sexe", "P-value"])
+    pval_diag_sex_df["Sexe"] = pval_diag_sex_df["Sexe"].replace({"1": "Homme", "2": "Femme"})
 
-fig4.update_layout(
-    height=300 * rows, width=700,
-    title_text=f"{hm_libelle} - Survie selon sexe ET groupe d'âge par quartiles",
-    template="plotly_white"
-)
+    st.write("### P-values log-rank selon la période de diagnostic par sexe")
+    st.table(pval_diag_sex_df)
 
-st.plotly_chart(fig4, use_container_width=True)
+    # Préparer le graphe avec facettes sur sexe
+    groupes_sexe = df6['sex'].unique()
+    rows = 1
+    cols = len(groupes_sexe)
 
-##### SELON SEX, GROUPE PAR ANNE DIAG (1997-2009 versus 2010-2022) ####
+    fig6 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Sexe : {'Homme' if g == '1' else 'Femme'}" for g in groupes_sexe])
 
-# Créer une colonne 'grp_annee_diag'
-hm5 = hm.copy()
-hm5['grp_annee_diag'] = np.where(hm5['annee_diag'] >= 2010, "2010-2022", "1997-2009")
+    kmf = KaplanMeierFitter()
 
-# Préparer les données
-df5 = hm5[['fup', 'event', 'sex', 'grp_annee_diag']].dropna()
-df5['sex'] = df5['sex'].astype(str)
-df5['grp_annee_diag'] = df5['grp_annee_diag'].astype(str)
+    for i, sexe in enumerate(groupes_sexe):
+        subset = df6[df6['sex'] == sexe]
+        row = 1
+        col = i + 1
 
-# Calcul des p-values log-rank par groupe
-from lifelines.statistics import logrank_test
+        for grp in subset['grp_annee_diag'].unique():
+            subgrp = subset[subset['grp_annee_diag'] == grp]
+            kmf.fit(subgrp['fup'], subgrp['event'], label=grp)
+            fig6.add_trace(
+                go.Scatter(
+                    x=kmf.survival_function_.index,
+                    y=kmf.survival_function_[grp],
+                    mode='lines',
+                    name=f"{grp} - {'Homme' if sexe == '1' else 'Femme'}",
+                    line=dict(
+                        color="brown" if grp == "1997-2009" else "darkgreen",
+                        dash="solid" if grp == "1997-2009" else "dash"
+                    )
+                ),
+                row=row, col=col
+            )
+            # IC
+            fig6.add_trace(
+                go.Scatter(
+                    x=kmf.confidence_interval_.index,
+                    y=kmf.confidence_interval_[grp + "_upper_0.95"],
+                    mode='lines', line=dict(width=0), showlegend=False
+                ),
+                row=row, col=col
+            )
+            fig6.add_trace(
+                go.Scatter(
+                    x=kmf.confidence_interval_.index,
+                    y=kmf.confidence_interval_[grp + "_lower_0.95"],
+                    fill='tonexty', fillcolor='rgba(0,0,0,0.1)',
+                    mode='lines', line=dict(width=0), showlegend=False
+                ),
+                row=row, col=col
+            )
 
-p_values_diag = []
-for grp in df5['grp_annee_diag'].unique():
-    grp_data = df5[df5['grp_annee_diag'] == grp]
-    sexes = grp_data['sex'].unique()
-    if len(sexes) > 1:
-        result = logrank_test(
-            grp_data[grp_data['sex'] == sexes[0]]['fup'],
-            grp_data[grp_data['sex'] == sexes[1]]['fup'],
-            grp_data[grp_data['sex'] == sexes[0]]['event'],
-            grp_data[grp_data['sex'] == sexes[1]]['event']
-        )
-        p_values_diag.append((grp, result.p_value))
-    else:
-        p_values_diag.append((grp, None))
+    fig6.update_layout(
+        height=400, width=1000,
+        title=f"{hm_libelle} – Survie selon la période de diagnostic\nFacetté par sexe",
+        template="plotly_white"
+    )
 
-pval_diag_df = pd.DataFrame(p_values_diag, columns=["Groupe d'année diagnostic", "P-value"])
-st.write("### P-values log-rank selon le sexe par période de diagnostic")
-st.table(pval_diag_df)
+    st.plotly_chart(fig6, use_container_width=True)
+        
+    #    else:
+    #        st.warning("Aucune donnée trouvée pour ce choix.")
 
-groupes_diag = df5['grp_annee_diag'].unique()
-cols = 2
-rows = (len(groupes_diag) + 1) // cols
-fig5 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Période: {g}" for g in groupes_diag])
-
-kmf = KaplanMeierFitter()
-
-for i, grp in enumerate(groupes_diag):
-    subset = df5[df5['grp_annee_diag'] == grp]
-    row = i // cols + 1
-    col = i % cols + 1
-
-    for sex in subset['sex'].unique():
-        sex_subset = subset[subset['sex'] == sex]
-        kmf.fit(sex_subset['fup'], sex_subset['event'], label=f"{'Homme' if sex == '1' else 'Femme'}")
-        fig5.add_trace(
-            go.Scatter(
-                x=kmf.survival_function_.index,
-                y=kmf.survival_function_[kmf._label],
-                mode='lines',
-                name=f"{kmf._label} - {grp}",
-                line=dict(color="blue" if sex == "1" else "red",
-                          dash="solid" if sex == "1" else "dash")
-            ),
-            row=row, col=col
-        )
-        # Ajouter les intervalles de confiance
-        fig5.add_trace(
-            go.Scatter(
-                x=kmf.confidence_interval_.index,
-                y=kmf.confidence_interval_[kmf._label + "_upper_0.95"],
-                mode='lines', line=dict(width=0), showlegend=False
-            ),
-            row=row, col=col
-        )
-        fig5.add_trace(
-            go.Scatter(
-                x=kmf.confidence_interval_.index,
-                y=kmf.confidence_interval_[kmf._label + "_lower_0.95"],
-                fill='tonexty', fillcolor='rgba(0,0,0,0.1)',
-                mode='lines', line=dict(width=0), showlegend=False
-            ),
-            row=row, col=col
-        )
-
-fig5.update_layout(
-    height=300 * rows, width=800,
-    title_text=f"{hm_libelle} - Survie selon sexe et période de diagnostic",
-    template="plotly_white"
-)
-
-st.plotly_chart(fig5, use_container_width=True)
-
-##### SELON ANNE DIAG (1997-2009 versus 2010-2022) PAR SEXE ####
-
-# Créer une colonne 'grp_annee_diag' selon les années de diagnostic
-hm6 = hm.copy()
-hm6['grp_annee_diag'] = np.where(hm6['annee_diag'] >= 2010, "2010-2022", "1997-2009")
-
-# Nettoyage et transformation
-df6 = hm5[['fup', 'event', 'sex', 'grp_annee_diag']].dropna()
-df6['sex'] = df6['sex'].astype(str)
-df6['grp_annee_diag'] = df6['grp_annee_diag'].astype(str)
-
-# P-values log-rank par sexe
-from lifelines.statistics import logrank_test
-
-p_values_diag_sex = []
-for sexe in df6['sex'].unique():
-    sexe_data = df6[df6['sex'] == sexe]
-    groupes = sexe_data['grp_annee_diag'].unique()
-    if len(groupes) > 1:
-        result = logrank_test(
-            sexe_data[sexe_data['grp_annee_diag'] == groupes[0]]['fup'],
-            sexe_data[sexe_data['grp_annee_diag'] == groupes[1]]['fup'],
-            sexe_data[sexe_data['grp_annee_diag'] == groupes[0]]['event'],
-            sexe_data[sexe_data['grp_annee_diag'] == groupes[1]]['event']
-        )
-        p_values_diag_sex.append((sexe, result.p_value))
-    else:
-        p_values_diag_sex.append((sexe, None))
-
-pval_diag_sex_df = pd.DataFrame(p_values_diag_sex, columns=["Sexe", "P-value"])
-pval_diag_sex_df["Sexe"] = pval_diag_sex_df["Sexe"].replace({"1": "Homme", "2": "Femme"})
-
-st.write("### P-values log-rank selon la période de diagnostic par sexe")
-st.table(pval_diag_sex_df)
-
-# Préparer le graphe avec facettes sur sexe
-groupes_sexe = df6['sex'].unique()
-rows = 1
-cols = len(groupes_sexe)
-
-fig6 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Sexe : {'Homme' if g == '1' else 'Femme'}" for g in groupes_sexe])
-
-kmf = KaplanMeierFitter()
-
-for i, sexe in enumerate(groupes_sexe):
-    subset = df6[df6['sex'] == sexe]
-    row = 1
-    col = i + 1
-
-    for grp in subset['grp_annee_diag'].unique():
-        subgrp = subset[subset['grp_annee_diag'] == grp]
-        kmf.fit(subgrp['fup'], subgrp['event'], label=grp)
-        fig6.add_trace(
-            go.Scatter(
-                x=kmf.survival_function_.index,
-                y=kmf.survival_function_[grp],
-                mode='lines',
-                name=f"{grp} - {'Homme' if sexe == '1' else 'Femme'}",
-                line=dict(
-                    color="brown" if grp == "1997-2009" else "darkgreen",
-                    dash="solid" if grp == "1997-2009" else "dash"
-                )
-            ),
-            row=row, col=col
-        )
-        # IC
-        fig6.add_trace(
-            go.Scatter(
-                x=kmf.confidence_interval_.index,
-                y=kmf.confidence_interval_[grp + "_upper_0.95"],
-                mode='lines', line=dict(width=0), showlegend=False
-            ),
-            row=row, col=col
-        )
-        fig6.add_trace(
-            go.Scatter(
-                x=kmf.confidence_interval_.index,
-                y=kmf.confidence_interval_[grp + "_lower_0.95"],
-                fill='tonexty', fillcolor='rgba(0,0,0,0.1)',
-                mode='lines', line=dict(width=0), showlegend=False
-            ),
-            row=row, col=col
-        )
-
-fig6.update_layout(
-    height=400, width=1000,
-    title=f"{hm_libelle} – Survie selon la période de diagnostic\nFacetté par sexe",
-    template="plotly_white"
-)
-
-st.plotly_chart(fig6, use_container_width=True)
-    
-#    else:
-#        st.warning("Aucune donnée trouvée pour ce choix.")
-
-#else:
-#    st.error("Les données valides (rrhmbn_valide) ne sont pas encore chargées.")
+    #else:
+    #    st.error("Les données valides (rrhmbn_valide) ne sont pas encore chargées.")
 
 
 # --- Section : Étude de la survie relative (Pohar-Perme) ---
 
-import requests
+    import requests
 
-st.markdown("## Étude de la survie relative (Pohar-Perme)")
+    st.markdown("## Étude de la survie nette (Pohar-Perme)")
 
-# --- Vérifie que la dataframe `hm` existe ---
-if 'hm' in locals() or 'hm' in globals():
-    st.write("Aperçu de la table `hm` :")
-    st.dataframe(hm)
+    # --- Vérifie que la dataframe `hm` existe ---
+    if 'hm' in locals() or 'hm' in globals():
+        # st.write("Aperçu de la table `hm` :")
+        # st.dataframe(hm)
 
-    # Génération automatique du CSV
-    csv_data = hm.to_csv(index=False).encode('utf-8')
+        # Génération automatique du CSV
+        csv_data = hm.to_csv(index=False).encode('utf-8')
 
-    # Bouton de téléchargement
-    st.download_button(
-        label="📥 Télécharger hm.csv",
-        data=csv_data,
-        file_name="hm.csv",
-        mime="text/csv"
-    )
+        # Bouton de téléchargement
+        st.download_button(
+            label="📥 Télécharger hm.csv",
+            data=csv_data,
+            file_name="hm.csv",
+            mime="text/csv"
+        )
 
-    # Bouton pour envoyer le CSV via POST
-    if st.button("📤 Envoyer hm.csv au serveur Shiny"):
         URL = "https://shiny-upload.emvle.fr/upload"
         HEADERS = {}
 
@@ -1732,17 +1728,63 @@ if 'hm' in locals() or 'hm' in globals():
 
             if response.status_code == 200:
                 st.success("CSV envoyé avec succès au serveur Shiny !")
-
-                # Lien vers le dashboard Shiny
-                shiny_url = "https://shiny.emvle.fr/rrhmbn"
-                st.markdown(f"[🚀 Ouvrir le dashboard Shiny]({shiny_url})", unsafe_allow_html=False)
-                
             else:
                 st.error(f"Échec de l'envoi (status {response.status_code}): {response.text}")
 
         except Exception as e:
             st.warning(f"Erreur lors de l'envoi : {e}")
-    
-       
-else:
-    st.warning("⚠️ La dataframe `hm` n’a pas encore été générée.")
+
+        shiny_url = "https://shiny.emvle.fr/rrhmbn_v2"
+        st.markdown(f"[🚀 Ouvrir le dashboard Shiny pour étude de la survie nette]({shiny_url})", unsafe_allow_html=False)
+        
+        
+
+        # # Bouton pour envoyer le CSV via POST
+        # if st.button("📤 Etude de la survie nette (méthode Pohar-Perme) [ouverture d'une nouvelle fenêtre]"):
+        #     URL = "https://shiny-upload.emvle.fr/upload"
+        #     HEADERS = {}
+
+        #     try:
+        #         # Sauvegarde temporaire du CSV pour l'envoi
+        #         with open("hm_temp.csv", "wb") as f:
+        #             f.write(csv_data)
+        #         # Envoi du fichier
+        #         with open("hm_temp.csv", "rb") as f:
+        #             files = {"file": ("hm.csv", f)}
+        #             response = requests.post(URL, files=files, headers=HEADERS, timeout=10)
+
+        #         st.write(f"Statut : {response.status_code}")
+        #         st.write("Réponse complète du serveur :", response.text)
+
+
+
+        #         if response.status_code == 200:
+        #             st.success("CSV envoyé avec succès au serveur Shiny !")
+
+        #             # Lien vers le dashboard Shiny
+        #             shiny_url = "https://shiny.emvle.fr/rrhmbn_v2"
+        #             # st.markdown(f"[🚀 Ouvrir le dashboard Shiny pour étude de la survie nette]({shiny_url})", unsafe_allow_html=False)
+        #             # Affiche un message et ouvre automatiquement le lien dans un nouvel onglet
+        #             st.markdown(
+        #                 f"""
+        #                 <p>Le fichier a bien été transmis. Ouverture du tableau de bord Shiny...</p>
+        #                 <p><a href="{shiny_url}" target="_blank">🚀 Ouvrir le dashboard manuellement</a></p>
+        #                 <script>
+        #                     // Attendre un court délai pour laisser Streamlit actualiser la page
+        #                     setTimeout(() => {{
+        #                         window.open("{shiny_url}", "_blank");
+        #                     }}, 800);
+        #                 </script>
+        #                 """,
+        #                 unsafe_allow_html=True
+        #             )
+
+        #         else:
+        #             st.error(f"Échec de l'envoi (status {response.status_code}): {response.text}")
+
+        #     except Exception as e:
+        #         st.warning(f"Erreur lors de l'envoi : {e}")
+        
+        
+    else:
+        st.warning("⚠️ La dataframe `hm` n’a pas encore été générée.")
