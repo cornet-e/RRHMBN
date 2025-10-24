@@ -215,6 +215,32 @@ st.line_chart(data=df_incid, x="Année", y="Nombre de cas")
 
 st.header("📊 Statistiques descriptives du registre")
 
+# Copier le DataFrame filtré si tu veux appliquer les filtres précédents
+df_tab = rrhmbn_valide.copy()
+
+global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
+
+# Filtrage par année
+df_tab = df_tab[
+    (df_tab["annee_diag"] >= global_annees_min_max[0]) &
+    (df_tab["annee_diag"] <= global_annees_min_max[1])
+]
+# Calculer les effectifs par patho_sous_type_label et sex
+tableau = df_tab.groupby(['patho_groupe_label', 'patho_sous_type_label', 'sex']).size().unstack(fill_value=0)
+
+# Renommer les colonnes pour plus de clarté
+tableau = tableau.rename(columns={1: "Hommes", 2: "Femmes"})
+
+# Ajouter une colonne "Total"
+tableau['Total'] = tableau['Hommes'] + tableau['Femmes']
+
+# Réinitialiser l'index pour un joli affichage
+tableau = tableau.reset_index()
+
+# Afficher le tableau dans Streamlit
+st.subheader("📊 Nombre de cas par pathologie et sexe")
+st.dataframe(tableau)
+
 # 1. Nombre total de cas
 # === Cas ===
 global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
