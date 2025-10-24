@@ -226,7 +226,7 @@ df_tab = df_tab[
     (df_tab["annee_diag"] <= global_annees_min_max[1])
 ]
 # Calculer les effectifs par patho_groupe_label, patho_sous_type_label et sex
-tableau = df.groupby(['patho_groupe_label', 'patho_sous_type_label', 'sex']).size().unstack(fill_value=0)
+tableau = df_tab.groupby(['patho_groupe_label', 'patho_sous_type_label', 'sex']).size().unstack(fill_value=0)
 tableau = tableau.rename(columns={1: "Hommes", 2: "Femmes"})
 tableau['Total'] = tableau['Hommes'] + tableau['Femmes']
 tableau = tableau.reset_index()
