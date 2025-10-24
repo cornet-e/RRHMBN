@@ -204,9 +204,6 @@ if file is not None:
 else:
     st.info("⏳ En attente de données...")
 
-# Assurez-vous d'avoir déjà défini le dataframe `rrhmbn_valide`
-# et qu'il contient les colonnes : 'age', 'sex', 'patho_sous_type_label', 'annee_diag'
-
 st.header("📊 Statistiques descriptives du registre")
 
 # 1. Nombre total de cas
@@ -281,7 +278,7 @@ st.header("🧬 Sélection d’un sous-ensemble de pathologies (HM)")
 if 'rrhmbn_valide' in locals():
 
     # Méthode de classification
-    choix0 = st.radio("Choix de classification :", ["REPIH", "XT", "ICDO", "ADICAP"])
+    choix0 = st.radio("Choix de classification :", ["REPIH", "XT", "ICDO", "ADICAP"], index=None)
 
     if choix0 == "REPIH":
         choix = st.radio("Type de sélection :", ["Groupe Patho", "Sous-Type Patho"])
@@ -289,7 +286,7 @@ if 'rrhmbn_valide' in locals():
         if choix == "Groupe Patho":
             # On sélectionne les libellés uniques
             libelles = rrhmbn_valide["patho_groupe_label"].dropna().unique()
-            libelle_sel = st.selectbox("Sélectionnez un libellé de groupe patho :", sorted(libelles))
+            libelle_sel = st.selectbox("Sélectionnez un libellé de groupe patho :", ["Sélectionner un libellé"] + sorted(libelles))
 
             # On filtre selon le libellé
             hm = rrhmbn_valide[rrhmbn_valide["patho_groupe_label"] == libelle_sel]
@@ -298,7 +295,7 @@ if 'rrhmbn_valide' in locals():
         elif choix == "Sous-Type Patho":
             # Liste des libellés uniques de sous-types
             sous_type_labels = rrhmbn_valide["patho_sous_type_label"].dropna().unique()
-            sous_type_label_sel = st.selectbox("Sélectionnez un libellé de sous-type patho :", sorted(sous_type_labels))
+            sous_type_label_sel = st.selectbox("Sélectionnez un libellé de sous-type patho :", ["Sélectionner un libellé"] + sorted(sous_type_labels))
 
             # Filtrer les cas selon le libellé
             hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_label"] == sous_type_label_sel]
@@ -307,7 +304,7 @@ if 'rrhmbn_valide' in locals():
 
     elif choix0 == "XT":
         xt_labels = rrhmbn_valide["patho_sous_type_XT_label"].dropna().unique()
-        xt_label_sel = st.selectbox("Sélectionnez un sous-type XT patho :", sorted(xt_labels))
+        xt_label_sel = st.selectbox("Sélectionnez un sous-type XT patho :", ["Sélectionner un libellé"] + sorted(xt_labels))
         hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_XT_label"] == xt_label_sel]
         hm_libelle = hm["patho_sous_type_XT_label"].iloc[0] if not hm.empty else None
     
@@ -465,7 +462,7 @@ if 'hm' in locals() and not hm.empty:
     st.dataframe(stats_age)
 
     #### INCIDENCE ####
-    st.subheader(f"📈 Taux d'incidence (pour 100 000 habitants) - {hm_libelle}")
+    st.title(f"📈 Taux d'incidence (pour 100 000 habitants) - {hm_libelle}")
 
     ### --- 1. Chargement et préparation des données ---
     # === Cas ===
