@@ -204,6 +204,15 @@ if file is not None:
 else:
     st.info("⏳ En attente de données...")
 
+st.subheader("📅 Nombre de cas incidents par année")
+incid = rrhmbn_valide["annee_diag"].value_counts().sort_index()
+df_incid = incid.reset_index()
+df_incid.columns = ["Année", "Nombre de cas"]
+df_incid["Année"] = df_incid["Année"].astype(str)
+
+# Affichage dans Streamlit
+st.line_chart(data=df_incid, x="Année", y="Nombre de cas")
+
 st.header("📊 Statistiques descriptives du registre")
 
 # 1. Nombre total de cas
@@ -288,9 +297,9 @@ st.plotly_chart(fig)
 #ax.axis("equal")
 #st.pyplot(fig)
 
-# 5. Incidence par année
+#  Incidence par année
 st.subheader("📅 Nombre de cas incidents par année")
-incid = rrhmbn_valide["annee_diag"].value_counts().sort_index()
+incid = df_cas_global["annee_diag"].value_counts().sort_index()
 df_incid = incid.reset_index()
 df_incid.columns = ["Année", "Nombre de cas"]
 df_incid["Année"] = df_incid["Année"].astype(str)
