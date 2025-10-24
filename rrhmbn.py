@@ -1729,15 +1729,19 @@ if 'hm' in locals() or 'hm' in globals():
                 shiny_url = "https://shiny.emvle.fr/rrhmbn_v2"
                 # st.markdown(f"[🚀 Ouvrir le dashboard Shiny pour étude de la survie nette]({shiny_url})", unsafe_allow_html=False)
                 # Affiche un message et ouvre automatiquement le lien dans un nouvel onglet
-                st.markdown(
-                    f"""
-                    <meta http-equiv="refresh" content="2;url={shiny_url}">
+                st.markdown(f"""
+                    <p>Redirection automatique vers le tableau de bord Shiny...</p>
+                    <p><a href="{shiny_url}" target="_blank" rel="noopener noreferrer">
+                    🚀 Ouvrir le dashboard Shiny (si la redirection ne s’est pas lancée)
+                    </a></p>
                     <script>
-                    window.open("{shiny_url}", "_blank");
+                        const newTab = window.open("{shiny_url}", "_blank", "noopener,noreferrer");
+                        if (!newTab) {{
+                            // Si le navigateur bloque la popup, afficher un message
+                            alert("Veuillez autoriser les fenêtres pop-up pour ouvrir le tableau de bord Shiny.");
+                        }}
                     </script>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                """, unsafe_allow_html=True)
 
             else:
                 st.error(f"Échec de l'envoi (status {response.status_code}): {response.text}")
