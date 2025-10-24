@@ -218,7 +218,7 @@ st.header("📊 Statistiques descriptives du registre")
 # Copier le DataFrame filtré si tu veux appliquer les filtres précédents
 df_tab = rrhmbn_valide.copy()
 
-global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
+global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022), key="slider_annees_1")
 
 # Filtrage par année
 df_tab = df_tab[
@@ -276,7 +276,7 @@ st.dataframe(styled_table, height=600)
 
 # 1. Nombre total de cas
 # === Cas ===
-global_annees_min_max_2 = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
+global_annees_min_max_2 = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022), key="slider_annees_2")
 
 
 # === Sélection du type ICD-O ===
