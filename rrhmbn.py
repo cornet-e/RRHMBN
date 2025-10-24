@@ -353,7 +353,7 @@ if st.button("Afficher le tableau de correspondance"):
 
 
 # Affichage et sauvegarde
-if 'hm' in locals() and not hm.empty:
+if hm_libelle and'hm' in locals() and not hm.empty:
     st.success(f"✅ Vous avez sélectionné : **{hm_libelle}** ({len(hm)} cas)")
     st.dataframe(hm)
 
