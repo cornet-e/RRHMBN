@@ -283,6 +283,8 @@ if 'rrhmbn_valide' in locals():
     if choix0 == "REPIH":
         choix = st.radio("Type de sélection :", ["Groupe Patho", "Sous-Type Patho"])
 
+        hm, hm_libelle = None, None  # Initialisation pour éviter erreurs
+        
         if choix == "Groupe Patho":
             # On sélectionne les libellés uniques
             libelles = rrhmbn_valide["patho_groupe_label"].dropna().unique()
@@ -353,7 +355,7 @@ if st.button("Afficher le tableau de correspondance"):
 
 
 # Affichage et sauvegarde
-if hm_libelle and'hm' in locals() and not hm.empty:
+if hm_libelle and 'hm' in locals() and not hm.empty:
     st.success(f"✅ Vous avez sélectionné : **{hm_libelle}** ({len(hm)} cas)")
     st.dataframe(hm)
 
