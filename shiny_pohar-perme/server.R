@@ -317,7 +317,27 @@ server <- function(input, output, session) {
       labs(title = title, x = "Temps (années)", y = "Taux de Surmortalité (%)") +
       theme_minimal(base_size = 13)
   }
-  
+
+  plot_TSM_by_sex <- function(df, title) {
+    ggplot(df, aes(x = Tstop, y = TSM)) +
+      geom_line(linewidth = 1.2, color = "blue") +
+      facet_wrap(~ sex, labeller = labeller(sex = c(`1` = "Hommes", `2` = "Femmes"))) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+      labs(title = title, x = "Temps (années)", y = "Taux de Surmortalité (%)") +
+      theme_minimal(base_size = 13)
+  }
+
+  plot_TSM_by_age_sex <- function(df, title) {
+    ggplot(df, aes(x = Tstop, y = TSM)) +
+      geom_line(linewidth = 1.2, color = "blue") +
+      facet_grid(age_quartile ~ sex,
+                 labeller = labeller(sex = c(`1` = "Hommes", `2` = "Femmes"))) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+      labs(title = title, x = "Temps (années)", y = "Taux de Surmortalité (%)") +
+      theme_minimal(base_size = 13)
+  }
+
+    
   output$plot_global <- renderPlotly({
     req(results())
     ggplotly(plot_surv(results()$global, "Survie brute, nette et attendue - Global"),
@@ -345,13 +365,13 @@ server <- function(input, output, session) {
 
   output$plot_TSM_sex <- renderPlotly({
     req(results())
-    ggplotly(plot_TSM(results()$sex, "Taux de Surmortalité (TSM) par sexe"),
+    ggplotly(plot_TSM_by_sex(results()$sex, "Taux de Surmortalité (TSM) par sexe"),
             tooltip = c("x", "y"))
   })
 
   output$plot_TSM_age_sex <- renderPlotly({
     req(results())
-    ggplotly(plot_TSM(results()$age_sex, "Taux de Surmortalité (TSM) par sexe et quartile d’âge"),
+    ggplotly(plot_TSM_by_age_sex(results()$age_sex, "Taux de Surmortalité (TSM) par sexe et quartile d’âge"),
              tooltip = c("x", "y"))
   })
 
