@@ -176,9 +176,9 @@ server <- function(input, output, session) {
     addLog("Analyse terminée avec succès.")
     
     # Calcul du TSM pour chaque DataFrame
-    df_global$TSM <- (df_global$surv.obs / df_global$surv.exp - 1) * 100
-    df_sex$TSM <- (df_sex$surv.obs / df_sex$surv.exp - 1) * 100
-    df_age_sex$TSM <- (df_age_sex$surv.obs / df_age_sex$surv.exp - 1) * 100
+    df_global$TSM <- (df_global$surv.exp / df_global$surv.obs - 1) * 100
+    df_sex$TSM <- (df_sex$surv.exp / df_sex$surv.obs - 1) * 100
+    df_age_sex$TSM <- (df_age_sex$surv.exp / df_age_sex$surv.obs - 1) * 100
 
     list(
       global = df_global,
