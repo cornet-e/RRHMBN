@@ -175,6 +175,11 @@ server <- function(input, output, session) {
     
     addLog("Analyse terminée avec succès.")
     
+    # Calcul du TSM pour chaque DataFrame
+    df_global$TSM <- (df_global$surv.obs / df_global$surv.exp - 1) * 100
+    df_sex$TSM <- (df_sex$surv.obs / df_sex$surv.exp - 1) * 100
+    df_age_sex$TSM <- (df_age_sex$surv.obs / df_age_sex$surv.exp - 1) * 100
+
     list(
       global = df_global,
       sex = df_sex,
@@ -304,6 +309,14 @@ server <- function(input, output, session) {
       labs(title = title, x = "Temps (années)", y = "Probabilité de survie") +
       theme_minimal(base_size = 13)
   }
+
+  plot_TSM <- function(df, title) {
+    ggplot(df, aes(x = Tstop, y = TSM)) +
+      geom_line(linewidth = 1.2, color = "blue") +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+      labs(title = title, x = "Temps (années)", y = "Taux de Surmortalité (%)") +
+      theme_minimal(base_size = 13)
+  }
   
   output$plot_global <- renderPlotly({
     req(results())
@@ -324,6 +337,25 @@ server <- function(input, output, session) {
              tooltip = c("x", "y", "colour"))
   })
   
+  output$plot_TSM_global <- renderPlotly({
+    req(results())
+    ggplotly(plot_TSM(results()$global, "Taux de Surmortalité (TSM) - Global"),
+             tooltip = c("x", "y"))
+  })
+
+  output$plot_TSM_sex <- renderPlotly({
+    req(results())
+    ggplotly(plot_TSM(results()$sex, "Taux de Surmortalité (TSM) par sexe"),
+            tooltip = c("x", "y"))
+  })
+
+  output$plot_TSM_age_sex <- renderPlotly({
+    req(results())
+    ggplotly(plot_TSM(results()$age_sex, "Taux de Surmortalité (TSM) par sexe et quartile d’âge"),
+             tooltip = c("x", "y"))
+  })
+
+
   # --- Déclenche automatiquement le clic sur "Lancer l'analyse" à l'ouverture ---
   observe({
     # on attend un tout petit délai pour laisser l'UI se charger
