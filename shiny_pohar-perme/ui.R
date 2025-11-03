@@ -34,6 +34,11 @@ ui <- fluidPage(
         tabPanel("TSM par Sexe", plotlyOutput("plot_TSM_sex")),
         tabPanel("TSM par Âge et Sexe", plotlyOutput("plot_TSM_age_sex")),
 
+        # Onglet pour excès de mortalité
+        tabPanel("Excès de mortalité pour 100 000 hab", plotlyOutput("plot_excess")),
+        tabPanel("Excès de mortalité pour 100 000 hab, par sexe", plotlyOutput("plot_excess_sex")),
+        tabPanel("Excès de mortalité pour 100 000 hab, par quartile d'âge et sexe", plotlyOutput("plot_excess_age_sex")),
+
         # Autres onglets de données
         tabPanel("Résumé des données", DT::dataTableOutput("summary_table")),
         tabPanel("Table survie globale", DT::dataTableOutput("table_global")),

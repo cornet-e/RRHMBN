@@ -172,20 +172,54 @@ server <- function(input, output, session) {
     )
     df_age_sex <- as.data.frame(summary(fit_net_age_sex)) %>%
       mutate(surv.exp = surv.obs / r.pp)
-    
-    addLog("Analyse terminée avec succès.")
-    
+        
     # Calcul du TSM pour chaque DataFrame
     df_global$TSM <- (df_global$surv.exp / df_global$surv.obs - 1) * 100
     df_sex$TSM <- (df_sex$surv.exp / df_sex$surv.obs - 1) * 100
     df_age_sex$TSM <- (df_age_sex$surv.exp / df_age_sex$surv.obs - 1) * 100
+
+      # calcul excess mortality rate par année de suivi
+    data_excess <- data_lex %>%
+      group_by(fot) %>%
+      summarise(
+        py = sum(lex.dur, na.rm = TRUE),
+        d = sum(lex.Xst == 1, na.rm = TRUE),
+        haz_obs = d / py,
+        haz_exp = sum(pop.haz * lex.dur, na.rm = TRUE) / py,
+        excess = haz_obs - haz_exp
+      )
+
+    data_excess_sex <- data_lex %>%
+      group_by(fot,sex) %>%
+      summarise(
+        py = sum(lex.dur, na.rm = TRUE),
+        d = sum(lex.Xst == 1, na.rm = TRUE),
+        haz_obs = d / py,
+        haz_exp = sum(pop.haz * lex.dur, na.rm = TRUE) / py,
+        excess = haz_obs - haz_exp
+      )
+
+    data_excess_age_sex <- data_lex %>%
+      group_by(fot, sex, age_quartile) %>%
+      summarise(
+        py = sum(lex.dur, na.rm = TRUE),
+        d = sum(lex.Xst == 1, na.rm = TRUE),
+        haz_obs = d / py,
+        haz_exp = sum(pop.haz * lex.dur, na.rm = TRUE) / py,
+        excess = haz_obs - haz_exp
+      )
+
+    addLog("Analyse terminée avec succès.")
 
     list(
       global = df_global,
       sex = df_sex,
       age_sex = df_age_sex,
       data_lex = data_lex,
-      data_raw = data
+      data_raw = data,
+      data_excess = data_excess,
+      data_excess_sex = data_excess_sex,
+      data_excess_age_sex = data_excess_age_sex
     )
   })
   
@@ -336,7 +370,6 @@ server <- function(input, output, session) {
       labs(title = title, x = "Temps (années)", y = "Taux de Surmortalité (%)") +
       theme_minimal(base_size = 13)
   }
-
     
   output$plot_global <- renderPlotly({
     req(results())
@@ -375,6 +408,51 @@ server <- function(input, output, session) {
              tooltip = c("x", "y"))
   })
 
+  output$plot_excess <- renderPlotly({
+    req(results())
+    df <- results()$data_excess
+
+    p <- ggplot(df, aes(x = fot, y = excess)) +
+      geom_line(linewidth = 1.2) +
+      labs(title = "Taux de mortalité en excès",
+          x = "Temps depuis diagnostic (années)",
+          y = "Décès par personne-année (excess)") +
+      theme_minimal(base_size = 13)
+
+    ggplotly(p, tooltip = c("x","y"))
+  })
+
+  output$plot_excess_sex <- renderPlotly({
+    req(results())
+    df <- results()$data_excess_sex
+
+    p <- ggplot(df, aes(x = fot, y = excess, color=sex)) +
+      geom_line(linewidth = 1.2) +
+      labs(title = "Taux de mortalité en excès",
+          x = "Temps depuis diagnostic (années)",
+          y = "Décès par personne-année (excess)") +
+      theme_minimal(base_size = 13)
+
+    ggplotly(p, tooltip = c("x","y"))
+  })
+
+  output$plot_excess_age_sex <- renderPlotly({
+    req(results())
+    df <- results()$data_excess_age_sex
+
+    p <- ggplot(data_excess_age_sex, aes(x = fot, y = excess, color = sex)) +
+      geom_line(linewidth = 1.1) +
+      facet_grid(age_quartile ~ sex,
+                labeller = labeller(
+                  sex = c(`1` = "Hommes", `2` = "Femmes")
+                )) +
+      labs(title = "Taux de mortalité en excès selon quartiles d’âge + sexe",
+          x = "Temps depuis diagnostic (années)",
+          y = "Décès par personne-année (excess)") +
+      theme_minimal(base_size = 13)
+
+    ggplotly(p, tooltip = c("x","y"))
+  })
 
   # --- Déclenche automatiquement le clic sur "Lancer l'analyse" à l'ouverture ---
   observe({
