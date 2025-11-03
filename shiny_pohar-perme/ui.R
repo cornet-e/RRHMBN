@@ -24,9 +24,17 @@ ui <- fluidPage(
     
     mainPanel(
       tabsetPanel(
+        # Onglets opur courbes de survie
         tabPanel("Global", plotlyOutput("plot_global")),
         tabPanel("Par sexe", plotlyOutput("plot_sex")),
         tabPanel("Par sexe et âge", plotlyOutput("plot_age_sex")),
+
+        # Onglets pour les TSM
+        tabPanel("TSM Global", plotlyOutput("plot_TSM_global")),
+        tabPanel("TSM par Sexe", plotlyOutput("plot_TSM_sex")),
+        tabPanel("TSM par Âge et Sexe", plotlyOutput("plot_TSM_age_sex")),
+
+        # Autres onglets de données
         tabPanel("Résumé des données", DT::dataTableOutput("summary_table")),
         tabPanel("Table survie globale", DT::dataTableOutput("table_global")),
         tabPanel("Table survie par sexe", DT::dataTableOutput("table_sex")),
