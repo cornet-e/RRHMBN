@@ -92,6 +92,14 @@ server <- function(input, output, session) {
   # --- Fonction de lexpand ---
   runLex <- function(data){
     pop <- pop_haz() %>% rename(agegroup=age, year=per)
+    
+    # 🔧 Ajuster les variables nécessaires à popEpi
+    data$agegroup <- floor(data$age_diag)   # âge en années entières
+    data$year <- floor(data$year_frac)      # année civile
+
+    # 🔧 restreindre aux années présentes dans pop_haz (sinon NA)
+    data <- data %>% dplyr::filter(year >= 1990, year <= 2023)
+    
     lex <- lexpand(data, birth=data$DateDuDiag-(data$age_diag*365.25),
                    entry=data$DateDuDiag, exit=data$DateDernieresNouvelles,
                    status=data$status, pophaz=pop, pp=TRUE, fot=0:30)
