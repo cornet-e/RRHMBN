@@ -1,5 +1,5 @@
 # Liste des packages à charger automatiquement
-packages <- c("curl","httr","dplyr", "ggplot2", "tidyr", "readr", "stringr","shiny","questionner","plotly","lubridate","data.table","forcats","purrr","tibble","caret","survival","randomForest","stats","mgcv","popEpi","Epi","jsonlite","DT","GWalkR","gtsummary","GGally")
+packages <- c("curl","httr","dplyr", "ggplot2", "tidyr", "readr", "stringr","shiny","questionr","plotly","lubridate","data.table","forcats","purrr","tibble","caret","survival","randomForest","stats","mgcv","popEpi","Epi","jsonlite","DT","GWalkR","gtsummary","GGally")
 
 # Fonction pour charger les packages (en installant ceux qui ne sont pas déjà installés)
 load_packages <- function(packages) {
