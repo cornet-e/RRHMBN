@@ -25,3 +25,7 @@ __pycache__/
 # Ignorer les fichiers système
 .DS_Store
 Thumbs.db
+
+# Ignorer fichier nominatif
+rrhmbn_brut.xlsx
+rrhmbn_brut2.xlsx

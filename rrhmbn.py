@@ -96,7 +96,7 @@ if file is not None:
             (df_filtre["Exclusion"] == "FALSE") &
             (df_filtre["A_Surveiller"] == "FALSE") &
             (df_filtre["Pre_Saisie"] == "FALSE") &
-            (df_filtre["annee_diag"] <= 2022) &
+            (df_filtre["annee_diag"] <= 2023) &
             (df_filtre["annee_diag"] >= 1997)
         ).astype(int)
 
@@ -218,7 +218,7 @@ st.header("📊 Statistiques descriptives du registre")
 # Copier le DataFrame filtré si tu veux appliquer les filtres précédents
 df_tab = rrhmbn_valide.copy()
 
-global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022), key="slider_annees_1")
+global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2023), key="slider_annees_1")
 
 # Filtrage par année
 df_tab = df_tab[
@@ -385,70 +385,77 @@ hm, hm_libelle = None, None  # Initialisation pour éviter erreurs
 
 if 'rrhmbn_valide' in locals():
 
-    # Méthode de classification
-    choix0 = st.radio("Choix de classification :", ["REPIH", "XT", "ICDO", "ADICAP"], index=None)
+    # 1. Ajout de l'option "Toutes les données"
+    choix0 = st.radio(
+        "Choix de classification :", 
+        ["Toutes les données", "REPIH", "XT", "ICDO", "ADICAP"], 
+        index=None
+    )
 
-    if choix0 == "REPIH":
+    # Initialisation par défaut
+    hm = rrhmbn_valide.copy()
+    hm_libelle = "Ensemble des données"
+
+    # 2. Gestion du cas "Toutes les données"
+    if choix0 == "Toutes les données":
+        hm = rrhmbn_valide.copy()
+        hm_libelle = "Toutes les données"
+        st.info(f"Vous avez sélectionné l'intégralité des données ({len(hm)} lignes).")
+
+    elif choix0 == "REPIH":
         choix = st.radio("Type de sélection :", ["Groupe Patho", "Sous-Type Patho"])
 
         if choix == "Groupe Patho":
-            # On sélectionne les libellés uniques
             libelles = rrhmbn_valide["patho_groupe_label"].dropna().unique()
             libelle_sel = st.selectbox("Sélectionnez un libellé de groupe patho :", ["Sélectionner un libellé"] + sorted(libelles))
-
-            # On filtre selon le libellé
-            hm = rrhmbn_valide[rrhmbn_valide["patho_groupe_label"] == libelle_sel]
-            hm_libelle = libelle_sel if not hm.empty else None
+            
+            if libelle_sel != "Sélectionner un libellé":
+                hm = rrhmbn_valide[rrhmbn_valide["patho_groupe_label"] == libelle_sel]
+                hm_libelle = libelle_sel
+            else:
+                hm = pd.DataFrame() # Vide tant que rien n'est sélectionné
 
         elif choix == "Sous-Type Patho":
-            # Liste des libellés uniques de sous-types
             sous_type_labels = rrhmbn_valide["patho_sous_type_label"].dropna().unique()
             sous_type_label_sel = st.selectbox("Sélectionnez un libellé de sous-type patho :", ["Sélectionner un libellé"] + sorted(sous_type_labels))
 
-            # Filtrer les cas selon le libellé
-            hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_label"] == sous_type_label_sel]
-            hm_libelle = sous_type_label_sel if not hm.empty else None
-
+            if sous_type_label_sel != "Sélectionner un libellé":
+                hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_label"] == sous_type_label_sel]
+                hm_libelle = sous_type_label_sel
+            else:
+                hm = pd.DataFrame()
 
     elif choix0 == "XT":
         xt_labels = rrhmbn_valide["patho_sous_type_XT_label"].dropna().unique()
         xt_label_sel = st.selectbox("Sélectionnez un sous-type XT patho :", ["Sélectionner un libellé"] + sorted(xt_labels))
-        hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_XT_label"] == xt_label_sel]
-        hm_libelle = hm["patho_sous_type_XT_label"].iloc[0] if not hm.empty else None
-    
-    # elif choix0 == "ICDO":
-    #     icdo = rrhmbn_valide["Code_MORPHO_Diag"].dropna().unique()
-    #     icdo_sel = st.selectbox("Sélectionnez un code ICDO :", sorted(icdo))
-    #     hm = rrhmbn_valide[rrhmbn_valide["Code_MORPHO_Diag"] == icdo_sel]
-    #     hm_libelle = hm["Code_MORPHO_Diag"].iloc[0] if not hm.empty else None
+        
+        if xt_label_sel != "Sélectionner un libellé":
+            hm = rrhmbn_valide[rrhmbn_valide["patho_sous_type_XT_label"] == xt_label_sel]
+            hm_libelle = xt_label_sel
+        else:
+            hm = pd.DataFrame()
     
     elif choix0 == "ICDO":
         icdo = rrhmbn_valide["Code_MORPHO_Diag"].dropna().unique()
-    
-        # Permet plusieurs choix
         icdo_sel = st.multiselect("Sélectionnez un ou plusieurs codes ICDO :", sorted(icdo))
     
-        # Filtrer les lignes correspondant aux choix multiples
         if icdo_sel:
             hm = rrhmbn_valide[rrhmbn_valide["Code_MORPHO_Diag"].isin(icdo_sel)]
-            hm_libelle = ", ".join(hm["Code_MORPHO_Diag"].unique())
+            hm_libelle = ", ".join(icdo_sel)
         else:
             hm = rrhmbn_valide.copy()
-            hm_libelle = None
+            hm_libelle = "Tous les codes ICDO"
 
     elif choix0 == "ADICAP":
         adicap = rrhmbn_valide["Code_ADICAP_Diag"].dropna().unique()
-    
-        # Permet plusieurs choix
         adicap_sel = st.multiselect("Sélectionnez un ou plusieurs codes ADICAP :", sorted(adicap))
     
-        # Filtrer les lignes correspondant aux choix multiples
         if adicap_sel:
             hm = rrhmbn_valide[rrhmbn_valide["Code_ADICAP_Diag"].isin(adicap_sel)]
-            hm_libelle = ", ".join(hm["Code_ADICAP_Diag"].unique())
+            hm_libelle = ", ".join(adicap_sel)
         else:
             hm = rrhmbn_valide.copy()
-            hm_libelle = None
+            hm_libelle = "Tous les codes ADICAP"
 
 # affichage des correspondances de classification
 
