@@ -91,7 +91,7 @@ if file is not None:
         for col in colonnes_a_verifier:
             df_filtre[col] = df_filtre[col].astype(str).str.upper().str.strip()
 
-        # Créer la colonne Cas_valides : 1 si toutes les 3 colonnes sont "FALSE", sinon 0 / pour année 1997 min et 2022 max
+        # Créer la colonne Cas_valides : 1 si toutes les 3 colonnes sont "FALSE", sinon 0 / pour année 1997 min et 2023 max
         df_filtre["Cas_valides"] = (
             (df_filtre["Exclusion"] == "FALSE") &
             (df_filtre["A_Surveiller"] == "FALSE") &
@@ -218,7 +218,7 @@ st.header("📊 Statistiques descriptives du registre")
 # Copier le DataFrame filtré si tu veux appliquer les filtres précédents
 df_tab = rrhmbn_valide.copy()
 
-global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2023), key="slider_annees_1")
+global_annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2026, value=(1997, 2023), key="slider_annees_1")
 
 # Filtrage par année
 df_tab = df_tab[
@@ -276,7 +276,7 @@ st.dataframe(styled_table, height=600)
 
 st.subheader("🦠 Nombre de cas incidents par pathologie (Top 20)")
 # === Cas ===
-global_annees_min_max_2 = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022), key="slider_annees_2")
+global_annees_min_max_2 = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2026, value=(1997, 2023), key="slider_annees_2")
 
 
 # === Sélection du type ICD-O ===
@@ -581,7 +581,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
 
     ### --- 1. Chargement et préparation des données ---
     # === Cas ===
-    annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2025, value=(1997, 2022))
+    annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2026, value=(1997, 2023))
     df_cas = hm.copy()
     df_cas = df_cas[
         (df_cas["annee_diag"] >= annees_min_max[0]) &
@@ -1138,97 +1138,113 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
 # ##### FIN DES DEF POUR SURVIE POP GENERALE #####
 
 
-    # Vérification des colonnes
-    for col in ['fup', 'event', 'sex']:
-        if col not in hm.columns:
-            st.error(f"Colonne manquante : {col}")
-            st.stop()
-
-    st.success(f"Analyse de : **{hm_libelle}** ({len(hm)} cas)")
-
-    # Nettoyage des données
+# 1. Nettoyage et définition des couleurs
     df = hm[['fup', 'event', 'sex']].dropna()
     df['sex'] = df['sex'].astype(str)
 
-    # Kaplan-Meier par sexe
+    # Mapping précis : Hommes (1) = Bleu, Femmes (2) = Rouge
+    colors = {"1": "blue", "2": "red"} 
+    
+    # Kaplan-Meier
     fig = go.Figure()
     kmf = KaplanMeierFitter()
     medians = {}
     rmeans = {}
-    colors = {"0": "blue", "1": "red"}  # Ajuste selon les valeurs réelles
 
-    # Test log-rank
     groups = df['sex'].unique()
-    if len(groups) != 2:
-        st.error("Il faut exactement deux groupes pour le test log-rank.")
-        st.stop()
+    # On trie pour s'assurer d'un ordre constant si besoin
+    groups = sorted(groups) 
 
-    # Séparer les deux groupes
-    group0 = df[df['sex'] == groups[0]]
-    group1 = df[df['sex'] == groups[1]]
-    result = logrank_test(group0['fup'], group1['fup'], group0['event'], group1['event'])
-    p_value = result.p_value
+    # --- CALCULS ET TRACES ---
 
-    # Courbes de survie
     for sex in groups:
         subset = df[df['sex'] == sex]
-        kmf.fit(subset['fup'], subset['event'], label=f"Sexe {sex}")
+        kmf.fit(subset['fup'], subset['event'])
+        
+        # Stockage des stats
         medians[sex] = kmf.median_survival_time_
         rmeans[sex] = kmf.conditional_time_to_event_.mean()
         
+        # Info-bulles
+        surv = kmf.survival_function_
+        ev_table = kmf.event_table
+        texts = [
+            f"Sexe: {'Homme' if sex == '1' else 'Femme' if sex == '2' else sex}<br>"
+            f"Temps: {t:.1f} m<br>Survie: {s:.2%}<br><b>À risque: {int(ev_table.loc[t, 'at_risk'])}</b>"
+            for t, s in zip(surv.index, surv.iloc[:, 0])
+        ]
+
+        # Trace principale
+        current_color = colors.get(sex, 'gray')
         fig.add_trace(go.Scatter(
-            x=kmf.survival_function_.index,
-            y=kmf.survival_function_[f"Sexe {sex}"],
+            x=surv.index, y=surv.iloc[:, 0],
             mode='lines',
-            name=f"Sexe {sex}",
-            line=dict(color=colors.get(sex, 'gray')),
+            name=f"{'Hommes' if sex == '1' else 'Femmes' if sex == '2' else sex}",
+            line=dict(color=current_color),
+            hovertext=texts,
+            hoverinfo="text"
         ))
 
-        # IC (bande)
+        # --- IC (bande) ---
+        ci = kmf.confidence_interval_
+        # On définit le fill_color avec la même logique
+        if sex == "1": # Hommes
+            fill_color = 'rgba(0, 0, 255, 0.1)' # Bleu transparent
+        elif sex == "2": # Femmes
+            fill_color = 'rgba(255, 0, 0, 0.1)' # Rouge transparent
+        else:
+            fill_color = 'rgba(128, 128, 128, 0.1)'
+
         fig.add_trace(go.Scatter(
-            x=kmf.confidence_interval_.index,
-            y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
-            mode='lines',
-            line=dict(width=0),
-            showlegend=False
+            x=ci.index, y=ci.iloc[:, 1], # Upper
+            mode='lines', line=dict(width=0), showlegend=False, hoverinfo="skip"
         ))
         fig.add_trace(go.Scatter(
-            x=kmf.confidence_interval_.index,
-            y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
-            fill='tonexty',
-            fillcolor='rgba(0,0,0,0.1)',
-            mode='lines',
-            line=dict(width=0),
-            name=f"IC 95% {sex}"
+            x=ci.index, y=ci.iloc[:, 0], # Lower
+            fill='tonexty', fillcolor=fill_color,
+            mode='lines', line=dict(width=0), showlegend=False, hoverinfo="skip"
         ))
 
-    # Annotations : médiane ou moyenne restreinte
+    # --- ANNOTATIONS ---
     annotations = []
     for sex in groups:
-        label = f"Sexe {sex}"
-        if not np.isnan(medians[sex]):
+        m_val = medians.get(sex, np.nan)
+        r_val = rmeans.get(sex, np.nan)
+        color_annot = colors.get(sex, "black")
+        label = "Hommes" if sex == "1" else "Femmes"
+
+        if pd.notnull(m_val) and not np.isinf(m_val):
             annotations.append(dict(
-                x=medians[sex], y=0.1,
-                text=f"Médiane : {round(medians[sex], 1)}",
+                x=m_val, y=0.5,
+                text=f"Médiane {label}: {m_val:.1f} m",
                 showarrow=True, arrowhead=1, ax=0, ay=-40,
-                font=dict(color=colors.get(sex, "black"))
+                font=dict(color=color_annot)
             ))
         else:
+            y_pos = 0.15 if sex == "1" else 0.05
             annotations.append(dict(
-                x=50, y=0.2 if sex == groups[0] else 0.1,
-                text=f"Moyenne restreinte : {round(rmeans[sex], 1)}",
-                showarrow=False,
-                font=dict(color=colors.get(sex, "black"))
+                x=df['fup'].max() * 0.7, y=y_pos,
+                text=f"Moyenne Restr. {label}: {r_val:.1f} m",
+                showarrow=False, font=dict(color=color_annot)
             ))
 
-    # Affichage
+    # Log-rank test (simplifié pour l'affichage)
+    try:
+        g1 = df[df['sex'] == groups[0]]
+        g2 = df[df['sex'] == groups[1]]
+        p_val = logrank_test(g1['fup'], g2['fup'], g1['event'], g2['event']).p_value
+        p_text = f"p = {p_val:.3e}"
+    except: 
+        p_text = "N/A"
+
     fig.update_layout(
-        title=f"{hm_libelle} - Survie selon le sexe<br><sup>Test de log-rank p = {p_value:.3e}</sup>",
+        title=f"{hm_libelle}<br><sup>Test Log-rank : {p_text}</sup>",
         xaxis_title="Temps (mois)",
-        yaxis_title="Probabilité de survie",
-        yaxis=dict(range=[0, 1]),
+        yaxis_title="Survie",
+        yaxis=dict(range=[0, 1.05]),
         annotations=annotations,
-        template="plotly_white"
+        template="plotly_white",
+        hovermode="closest"
     )
 
     st.plotly_chart(fig, use_container_width=True)
@@ -1610,11 +1626,11 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
 
     st.plotly_chart(fig4, use_container_width=True)
 
-    ##### SELON SEX, GROUPE PAR ANNE DIAG (1997-2009 versus 2010-2022) ####
+    ##### SELON SEX, GROUPE PAR ANNE DIAG (1997-2009 versus 2010-2023) ####
 
     # Créer une colonne 'grp_annee_diag'
     hm5 = hm.copy()
-    hm5['grp_annee_diag'] = np.where(hm5['annee_diag'] >= 2010, "2010-2022", "1997-2009")
+    hm5['grp_annee_diag'] = np.where(hm5['annee_diag'] >= 2010, "2010-2023", "1997-2009")
 
     # Préparer les données
     df5 = hm5[['fup', 'event', 'sex', 'grp_annee_diag']].dropna()
@@ -1696,11 +1712,11 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
 
     st.plotly_chart(fig5, use_container_width=True)
 
-    ##### SELON ANNE DIAG (1997-2009 versus 2010-2022) PAR SEXE ####
+    ##### SELON ANNE DIAG (1997-2009 versus 2010-2023) PAR SEXE ####
 
     # Créer une colonne 'grp_annee_diag' selon les années de diagnostic
     hm6 = hm.copy()
-    hm6['grp_annee_diag'] = np.where(hm6['annee_diag'] >= 2010, "2010-2022", "1997-2009")
+    hm6['grp_annee_diag'] = np.where(hm6['annee_diag'] >= 2010, "2010-2023", "1997-2009")
 
     # Nettoyage et transformation
     df6 = hm5[['fup', 'event', 'sex', 'grp_annee_diag']].dropna()
