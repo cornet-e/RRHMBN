@@ -388,7 +388,7 @@ if 'rrhmbn_valide' in locals():
     # 1. Ajout de l'option "Toutes les données"
     choix0 = st.radio(
         "Choix de classification :", 
-        ["Toutes les données", "REPIH", "XT", "ICDO", "ADICAP"], 
+        ["Toutes les données", "Comportement ICDO", "REPIH", "XT", "ICDO", "ADICAP"], 
         index=None
     )
 
@@ -401,6 +401,15 @@ if 'rrhmbn_valide' in locals():
         hm = rrhmbn_valide.copy()
         hm_libelle = "Toutes les données"
         st.info(f"Vous avez sélectionné l'intégralité des données ({len(hm)} lignes).")
+
+    elif choix0 == "Comportement ICDO":
+        choix = st.radio("Comportement :", ["ICDO/1", "ICDO/3"])
+
+        if choix == "ICDO/1":
+            hm = rrhmbn_valide[rrhmbn_valide["Code_MORPHO_Diag"].astype(str).str.endswith("1")]
+
+        elif choix == "ICDO/3":
+            hm = rrhmbn_valide[rrhmbn_valide["Code_MORPHO_Diag"].astype(str).str.endswith("3")]
 
     elif choix0 == "REPIH":
         choix = st.radio("Type de sélection :", ["Groupe Patho", "Sous-Type Patho"])
@@ -774,7 +783,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     ############# INCIDENCE PAR SEXE ET PERIODE #############
     st.subheader(f"📊 Taux d'incidence (par sexe et période) - {hm_libelle}")
 
-    pas = st.slider("Durée des périodes (en années)", min_value=1, max_value=10, value=1, step=1) # Exemple : périodes de 5 ans (modifiable dynamiquement)
+    pas = st.slider("Durée des périodes (en années)", min_value=1, max_value=30, value=1, step=1) # Exemple : périodes de 5 ans (modifiable dynamiquement)
     min_annee = df_cas["annee_diag"].min()
     max_annee = df_cas["annee_diag"].max()
 
@@ -1798,7 +1807,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
 
     fig6.update_layout(
         height=400, width=1000,
-        title=f"{hm_libelle} – Survie selon la période de diagnostic\nFacetté par sexe",
+        title=f"{hm_libelle} – Survie selon la période de diagnostic\n par sexe",
         template="plotly_white"
     )
 
