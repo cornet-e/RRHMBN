@@ -897,7 +897,11 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         x="Période", y="taux_brut",
         color="sexe", markers=True,
         title=f"Taux brut ({zone_label})",
-        labels={"taux_brut": "Taux / 100 000 hab."}
+        labels={"taux_brut": "Taux / 100 000 hab."},
+        color_discrete_map={
+        "Homme": "blue",
+        "Femme": "red"
+         }
     )
     fig.update_layout(title_font_size=16)
     st.plotly_chart(fig)
@@ -924,7 +928,11 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         x="Période", y="taux_std_europe",
         color="sexe", markers=True,
         title=f"Taux standardisé Europe ({zone_label})",
-        labels={"taux_std_europe": "Taux / 100 000 hab."}
+        labels={"taux_std_europe": "Taux / 100 000 hab."},
+        color_discrete_map={
+        "Homme": "blue",
+        "Femme": "red"
+         }
     )
     fig.update_layout(title_font_size=16)
     st.plotly_chart(fig)
@@ -951,7 +959,11 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         x="Période", y="taux_std_monde",
         color="sexe", markers=True,
         title=f"Taux standardisé Monde ({zone_label})",
-        labels={"taux_std_monde": "Taux / 100 000 hab."}
+        labels={"taux_std_monde": "Taux / 100 000 hab."},
+        color_discrete_map={
+        "Homme": "blue",
+        "Femme": "red"
+         }
     )
     fig.update_layout(title_font_size=16)
     st.plotly_chart(fig)
@@ -1018,6 +1030,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         title=f"Taux brut d’incidence (2 sexes confondus) – {zone_label}",
         labels={"taux_brut": "Taux pour 100 000 hab."}
     )
+    fig.update_traces(line_color='brown')
     st.plotly_chart(fig)
 
     # Taux standardisé Europe
@@ -1027,6 +1040,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         title=f"Taux standardisé Europe (2 sexes confondus) – {zone_label}",
         labels={"taux_std_europe": "Taux pour 100 000 hab."}
     )
+    fig.update_traces(line_color='brown')
     st.plotly_chart(fig)
 
     # Taux standardisé Monde
@@ -1036,6 +1050,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         title=f"Taux standardisé Monde (2 sexes confondus) – {zone_label}",
         labels={"taux_std_monde": "Taux pour 100 000 hab."}
     )
+    fig.update_traces(line_color='brown')
     st.plotly_chart(fig)
 
     st.title("📈 Analyse de survie par sexe (Kaplan-Meier)")
@@ -1214,28 +1229,43 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
             mode='lines', line=dict(width=0), showlegend=False, hoverinfo="skip"
         ))
 
-    # --- ANNOTATIONS ---
-    annotations = []
-    for sex in groups:
-        m_val = medians.get(sex, np.nan)
-        r_val = rmeans.get(sex, np.nan)
-        color_annot = colors.get(sex, "black")
-        label = "Hommes" if sex == "1" else "Femmes"
+    # # --- ANNOTATIONS ---
+    # annotations = []
+    # for sex in groups:
+    #     m_val = medians.get(sex, np.nan)
+    #     r_val = rmeans.get(sex, np.nan)
+    #     color_annot = colors.get(sex, "black")
+    #     label = "Hommes" if sex == "1" else "Femmes"
 
+    #     if pd.notnull(m_val) and not np.isinf(m_val):
+    #         annotations.append(dict(
+    #             x=m_val, y=0.5,
+    #             text=f"Médiane {label}: {m_val:.1f} m",
+    #             showarrow=True, arrowhead=1, ax=0, ay=-40,
+    #             font=dict(color=color_annot)
+    #         ))
+    #     else:
+    #         y_pos = 0.15 if sex == "1" else 0.05
+    #         annotations.append(dict(
+    #             x=df['fup'].max() * 0.7, y=y_pos,
+    #             text=f"Moyenne Restr. {label}: {r_val:.1f} m",
+    #             showarrow=False, font=dict(color=color_annot)
+    #         ))
+   
+    # --- LIGNES DE PROJECTION DE LA MÉDIANE ---
+        m_val = medians.get(sex, np.nan)
+        
         if pd.notnull(m_val) and not np.isinf(m_val):
-            annotations.append(dict(
-                x=m_val, y=0.5,
-                text=f"Médiane {label}: {m_val:.1f} m",
-                showarrow=True, arrowhead=1, ax=0, ay=-40,
-                font=dict(color=color_annot)
-            ))
-        else:
-            y_pos = 0.15 if sex == "1" else 0.05
-            annotations.append(dict(
-                x=df['fup'].max() * 0.7, y=y_pos,
-                text=f"Moyenne Restr. {label}: {r_val:.1f} m",
-                showarrow=False, font=dict(color=color_annot)
-            ))
+            # Ligne horizontale (de 0 à la médiane)
+            fig.add_shape(
+                type="line", x0=0, y0=0.5, x1=m_val, y1=0.5,
+                line=dict(color="gray", width=1, dash="dash"),
+            )
+            # Ligne verticale (de la médiane vers l'axe X)
+            fig.add_shape(
+                type="line", x0=m_val, y0=0.5, x1=m_val, y1=0,
+                line=dict(color="gray", width=1, dash="dash"),
+            )
 
     # Log-rank test (simplifié pour l'affichage)
     try:
@@ -1246,17 +1276,43 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     except: 
         p_text = "N/A"
 
+    # Préparation du texte pour le bloc en haut à droite
+    stats_text = "<b>Médianes de survie :</b><br>"
+    for sex in groups:
+        label = "Hommes" if sex == "1" else "Femmes"
+        m_val = medians.get(sex, np.nan)
+        color_hex = "blue" if sex == "1" else "red"
+        
+        if pd.notnull(m_val) and not np.isinf(m_val):
+            stats_text += f"<span style='color:{color_hex}'>{label} : {m_val:.1f} mois</span><br>"
+        else:
+            r_val = rmeans.get(sex, np.nan)
+            stats_text += f"<span style='color:{color_hex}'>{label} : Moy. restr. {r_val:.1f} m</span><br>"
+
+    # Mise à jour finale du layout
     fig.update_layout(
         title=f"{hm_libelle}<br><sup>Test Log-rank : {p_text}</sup>",
         xaxis_title="Temps (mois)",
-        yaxis_title="Survie",
-        yaxis=dict(range=[0, 1.05]),
-        annotations=annotations,
+        yaxis_title="Probabilité de survie",
+        yaxis=dict(range=[0, 1.05], tickformat=".0%"), # Format pourcentage sur l'axe Y
         template="plotly_white",
-        hovermode="closest"
+        hovermode="closest",
+        showlegend=True,
+        annotations=[
+            dict(
+                x=0.98, y=0.98, # Position en haut à droite (coordonnées relatives)
+                xref="paper", yref="paper",
+                text=stats_text,
+                showarrow=False,
+                align="left",
+                bgcolor="rgba(255, 255, 255, 0.8)",
+                bordercolor="lightgray",
+                borderwidth=1
+            )
+        ]
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width='stretch')
 
     # ### tracé courbe survie pop générale
     # df_insee = {
@@ -1338,7 +1394,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     df2['groupe_age'] = df2['groupe_age'].astype(str)
 
     groupes_age = df2['groupe_age'].unique()
-    colors = {"0": "blue", "1": "red"}
+    colors = {"1": "blue", "2": "red"}
 
     # Création d'une figure avec un subplot par groupe d'âge (arrangé en 2 colonnes max)
     cols = 2
@@ -1351,6 +1407,8 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
             continue
 
         kmf = KaplanMeierFitter()
+
+        show_leg = { "1": True, "2": True }
 
         for sex in subset['sex'].unique():
             sex_subset = subset[subset['sex'] == sex]
@@ -1368,36 +1426,50 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
                     x=kmf.survival_function_.index,
                     y=kmf.survival_function_[f"Sexe {sex}"],
                     mode='lines',
-                    name=f"Sexe {sex}",
-                    line=dict(color=colors.get(sex, 'gray'))
+                    name=f"{'Hommes' if sex == '1' else 'Femmes'} - {ga}",
+                    line=dict(color=colors.get(sex, 'gray')),
+                    # Groupement : cliquer sur un "Hommes" cachera TOUS les "Hommes"
+                    # legendgroup="Hommes" if sex == "1" else "Femmes",
+                    # On n'affiche la légende que la première fois qu'on croise ce sexe
+                    showlegend=show_leg[sex]                   
                 ),
                 row=row, col=col
             )
+            
 
             # IC
+            if str(sex).lower() in ['homme', '1', 'm']:
+                couleur_remplissage = 'rgba(0, 100, 255, 0.2)'  # Bleu transparent
+            else:
+                couleur_remplissage = 'rgba(255, 50, 50, 0.2)'   # Rouge transparent
+
             fig2.add_trace(
                 go.Scatter(
                     x=kmf.confidence_interval_.index,
                     y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
                     mode='lines',
                     line=dict(width=0),
-                    showlegend=False
+                    showlegend=False,
+                    hoverinfo='skip'
                 ),
                 row=row, col=col
             )
+            
             fig2.add_trace(
                 go.Scatter(
                     x=kmf.confidence_interval_.index,
                     y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
                     fill='tonexty',
-                    fillcolor='rgba(0,0,0,0.1)',
+                    fillcolor=couleur_remplissage,
                     mode='lines',
                     line=dict(width=0),
                     name=f"IC 95% {sex}",
-                    showlegend=False
+                    showlegend=False,
+                    hoverinfo='skip'
                 ),
                 row=row, col=col
             )
+
 
     fig2.update_layout(
         height=300 * rows, width=700,
@@ -1405,7 +1477,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         template="plotly_white"
     )
 
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig2, width='stretch')
 
     ### Survie par sexe et groupe d'âge "0-25 ans", "26-50 ans", "51-75 ans", "75 ans+"
     #  survie par sexe et groupe age calculé
@@ -1444,8 +1516,8 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     st.table(pval_df)
 
     groupes_age = df3['grp_age'].unique()
-    colors = {"0": "blue", "1": "red"}  # Ajuste si tes valeurs sex diffèrent
-    line_types = {"0": "solid", "1": "dash"}
+    colors = {"1": "blue", "2": "red"}  # Ajuste si tes valeurs sex diffèrent
+    line_types = {"1": "solid", "2": "solid"}
 
     cols = 2
     rows = (len(groupes_age) + 1) // cols
@@ -1473,36 +1545,45 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
                     x=kmf.survival_function_.index,
                     y=kmf.survival_function_[f"Sexe {sex}"],
                     mode='lines',
-                    name=f"Sexe {sex} - {ga}",
+                    name=f"{'Hommes' if sex == '1' else 'Femmes'} - {ga}",
                     line=dict(color=colors.get(sex, "gray"), dash=line_types.get(sex, "solid"))
                 ),
                 row=row, col=col
             )
 
             # IC
+            if str(sex).lower() in ['homme', '1', 'm']:
+                couleur_remplissage = 'rgba(0, 100, 255, 0.2)'  # Bleu transparent
+            else:
+                couleur_remplissage = 'rgba(255, 50, 50, 0.2)'   # Rouge transparent
+
             fig3.add_trace(
                 go.Scatter(
                     x=kmf.confidence_interval_.index,
                     y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
                     mode='lines',
                     line=dict(width=0),
-                    showlegend=False
+                    showlegend=False,
+                    hoverinfo='skip'
                 ),
                 row=row, col=col
             )
+            
             fig3.add_trace(
                 go.Scatter(
                     x=kmf.confidence_interval_.index,
                     y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
                     fill='tonexty',
-                    fillcolor='rgba(0,0,0,0.1)',
+                    fillcolor=couleur_remplissage,
                     mode='lines',
                     line=dict(width=0),
                     name=f"IC 95% {sex}",
-                    showlegend=False
+                    showlegend=False,
+                    hoverinfo='skip'
                 ),
                 row=row, col=col
             )
+
 
     fig3.update_layout(
         height=300 * rows, width=700,
@@ -1568,8 +1649,8 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
 
     # Tracer les courbes Kaplan-Meier facettées sur les groupes d'âge (quartiles)
     groupes_age = df4['grp_age'].unique()
-    colors = {"0": "blue", "1": "red"}  # Ajuster selon codage sex
-    line_types = {"0": "solid", "1": "dash"}
+    colors = {"1": "blue", "2": "red"}  # Ajuster selon codage sex
+    line_types = {"1": "solid", "2": "solid"}
 
     cols = 2
     rows = (len(groupes_age) + 1) // cols
@@ -1597,35 +1678,45 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
                     x=kmf.survival_function_.index,
                     y=kmf.survival_function_[f"Sexe {sex}"],
                     mode='lines',
-                    name=f"Sexe {sex} - {ga}",
+                    name=f"{'Hommes' if sex == '1' else 'Femmes'} - {ga}",
                     line=dict(color=colors.get(sex, "gray"), dash=line_types.get(sex, "solid"))
                 ),
                 row=row, col=col
             )
 
             # IC
+            if str(sex).lower() in ['homme', '1', 'm']:
+                couleur_remplissage = 'rgba(0, 100, 255, 0.2)'  # Bleu transparent
+            else:
+                couleur_remplissage = 'rgba(255, 50, 50, 0.2)'   # Rouge transparent
+
             fig4.add_trace(
                 go.Scatter(
                     x=kmf.confidence_interval_.index,
                     y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
                     mode='lines',
                     line=dict(width=0),
-                    showlegend=False
+                    showlegend=False,
+                    hoverinfo='skip'
                 ),
                 row=row, col=col
             )
+            
             fig4.add_trace(
                 go.Scatter(
                     x=kmf.confidence_interval_.index,
                     y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
                     fill='tonexty',
-                    fillcolor='rgba(0,0,0,0.1)',
+                    fillcolor=couleur_remplissage,
                     mode='lines',
                     line=dict(width=0),
-                    showlegend=False
+                    name=f"IC 95% {sex}",
+                    showlegend=False,
+                    hoverinfo='skip'
                 ),
                 row=row, col=col
             )
+
 
     fig4.update_layout(
         height=300 * rows, width=700,
@@ -1682,7 +1773,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
 
         for sex in subset['sex'].unique():
             sex_subset = subset[subset['sex'] == sex]
-            kmf.fit(sex_subset['fup'], sex_subset['event'], label=f"{'Homme' if sex == '1' else 'Femme'}")
+            kmf.fit(sex_subset['fup'], sex_subset['event'], label=f"{'Hommes' if sex == '1' else 'Femmes'}")
             fig5.add_trace(
                 go.Scatter(
                     x=kmf.survival_function_.index,
@@ -1690,28 +1781,44 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
                     mode='lines',
                     name=f"{kmf._label} - {grp}",
                     line=dict(color="blue" if sex == "1" else "red",
-                            dash="solid" if sex == "1" else "dash")
+                            dash="solid" if sex == "1" else "solid")
                 ),
                 row=row, col=col
             )
-            # Ajouter les intervalles de confiance
+
+            # IC
+            if str(sex).lower() in ['homme', '1', 'm']:
+                couleur_remplissage = 'rgba(0, 100, 255, 0.2)'  # Bleu transparent
+            else:
+                couleur_remplissage = 'rgba(255, 50, 50, 0.2)'   # Rouge transparent
+
             fig5.add_trace(
                 go.Scatter(
                     x=kmf.confidence_interval_.index,
                     y=kmf.confidence_interval_[kmf._label + "_upper_0.95"],
-                    mode='lines', line=dict(width=0), showlegend=False
+                    mode='lines',
+                    line=dict(width=0),
+                    showlegend=False,
+                    hoverinfo='skip'
                 ),
                 row=row, col=col
             )
+            
             fig5.add_trace(
                 go.Scatter(
                     x=kmf.confidence_interval_.index,
                     y=kmf.confidence_interval_[kmf._label + "_lower_0.95"],
-                    fill='tonexty', fillcolor='rgba(0,0,0,0.1)',
-                    mode='lines', line=dict(width=0), showlegend=False
+                    fill='tonexty',
+                    fillcolor=couleur_remplissage,
+                    mode='lines',
+                    line=dict(width=0),
+                    name=f"IC 95% {sex}",
+                    showlegend=False,
+                    hoverinfo='skip'
                 ),
                 row=row, col=col
             )
+
 
     fig5.update_layout(
         height=300 * rows, width=800,
