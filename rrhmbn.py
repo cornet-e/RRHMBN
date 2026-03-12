@@ -1312,7 +1312,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         ]
     )
 
-    st.plotly_chart(fig, use_container_width='stretch')
+    st.plotly_chart(fig, width='stretch')
 
     # ### tracé courbe survie pop générale
     # df_insee = {
@@ -1385,7 +1385,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     #     template="plotly_white"
     # )
 
-    # st.plotly_chart(fig, use_container_width=True)
+    # st.plotly_chart(fig, width='stretch')
 
     ### Analyse Survie par sexe et groupe age ###
 
@@ -1400,6 +1400,8 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     cols = 2
     rows = (len(groupes_age) + 1) // cols
     fig2 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Groupe d'âge: {ga}" for ga in groupes_age])
+
+    medians_subset = {}
 
     for i, ga in enumerate(groupes_age):
         subset = df2[df2['groupe_age'] == ga]
@@ -1468,6 +1470,24 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
                     hoverinfo='skip'
                 ),
                 row=row, col=col
+            )
+
+            # --- LIGNES DE PROJECTION DE LA MÉDIANE ---
+            medians_subset[sex]=kmf.median_survival_time_
+            m_val = medians_subset.get(sex, np.nan)
+            
+            if pd.notnull(m_val) and not np.isinf(m_val):
+                # Ligne horizontale (de 0 à la médiane)
+                fig2.add_shape(
+                    type="line", x0=0, y0=0.5, x1=m_val, y1=0.5,
+                    line=dict(color="gray", width=1, dash="dash"),
+                    row=row, col=col
+                )
+                # Ligne verticale (de la médiane vers l'axe X)
+                fig2.add_shape(
+                    type="line", x0=m_val, y0=0.5, x1=m_val, y1=0,
+                    line=dict(color="gray", width=1, dash="dash"),
+                    row=row,col=col
             )
 
 
@@ -1584,6 +1604,24 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
                 row=row, col=col
             )
 
+            # --- LIGNES DE PROJECTION DE LA MÉDIANE ---
+            medians_subset[sex]=kmf.median_survival_time_
+            m_val = medians_subset.get(sex, np.nan)
+            
+            if pd.notnull(m_val) and not np.isinf(m_val):
+                # Ligne horizontale (de 0 à la médiane)
+                fig3.add_shape(
+                    type="line", x0=0, y0=0.5, x1=m_val, y1=0.5,
+                    line=dict(color="gray", width=1, dash="dash"),
+                    row=row, col=col
+                )
+                # Ligne verticale (de la médiane vers l'axe X)
+                fig3.add_shape(
+                    type="line", x0=m_val, y0=0.5, x1=m_val, y1=0,
+                    line=dict(color="gray", width=1, dash="dash"),
+                    row=row,col=col
+            )
+
 
     fig3.update_layout(
         height=300 * rows, width=700,
@@ -1591,7 +1629,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         template="plotly_white"
     )
 
-    st.plotly_chart(fig3, use_container_width=True)
+    st.plotly_chart(fig3, width='stretch')
 
     ### Survie par sexe et Quartiles calculés d'âge
     # Calculer les quartiles de la colonne 'age'
@@ -1717,6 +1755,24 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
                 row=row, col=col
             )
 
+                        # --- LIGNES DE PROJECTION DE LA MÉDIANE ---
+            medians_subset[sex]=kmf.median_survival_time_
+            m_val = medians_subset.get(sex, np.nan)
+            
+            if pd.notnull(m_val) and not np.isinf(m_val):
+                # Ligne horizontale (de 0 à la médiane)
+                fig4.add_shape(
+                    type="line", x0=0, y0=0.5, x1=m_val, y1=0.5,
+                    line=dict(color="gray", width=1, dash="dash"),
+                    row=row, col=col
+                )
+                # Ligne verticale (de la médiane vers l'axe X)
+                fig4.add_shape(
+                    type="line", x0=m_val, y0=0.5, x1=m_val, y1=0,
+                    line=dict(color="gray", width=1, dash="dash"),
+                    row=row,col=col
+            )
+
 
     fig4.update_layout(
         height=300 * rows, width=700,
@@ -1724,7 +1780,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         template="plotly_white"
     )
 
-    st.plotly_chart(fig4, use_container_width=True)
+    st.plotly_chart(fig4, width='stretch')
 
     ##### SELON SEX, GROUPE PAR ANNE DIAG (1997-2009 versus 2010-2023) ####
 
@@ -1819,6 +1875,24 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
                 row=row, col=col
             )
 
+            # --- LIGNES DE PROJECTION DE LA MÉDIANE ---
+            medians_subset[sex]=kmf.median_survival_time_
+            m_val = medians_subset.get(sex, np.nan)
+            
+            if pd.notnull(m_val) and not np.isinf(m_val):
+                # Ligne horizontale (de 0 à la médiane)
+                fig5.add_shape(
+                    type="line", x0=0, y0=0.5, x1=m_val, y1=0.5,
+                    line=dict(color="gray", width=1, dash="dash"),
+                    row=row, col=col
+                )
+                # Ligne verticale (de la médiane vers l'axe X)
+                fig5.add_shape(
+                    type="line", x0=m_val, y0=0.5, x1=m_val, y1=0,
+                    line=dict(color="gray", width=1, dash="dash"),
+                    row=row,col=col
+            )
+
 
     fig5.update_layout(
         height=300 * rows, width=800,
@@ -1826,7 +1900,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         template="plotly_white"
     )
 
-    st.plotly_chart(fig5, use_container_width=True)
+    st.plotly_chart(fig5, width='stretch')
 
     ##### SELON ANNE DIAG (1997-2009 versus 2010-2023) PAR SEXE ####
 
@@ -1918,7 +1992,7 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         template="plotly_white"
     )
 
-    st.plotly_chart(fig6, use_container_width=True)
+    st.plotly_chart(fig6, width='stretch')
         
     #    else:
     #        st.warning("Aucune donnée trouvée pour ce choix.")
