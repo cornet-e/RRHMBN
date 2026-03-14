@@ -585,40 +585,6 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     stats_age = stats_age_par_sexe(hm)
     st.dataframe(stats_age)
 
-    #### INCIDENCE ####
-    st.title(f"📈 Taux d'incidence (pour 100 000 habitants) - {hm_libelle}")
-
-    ### --- 1. Chargement et préparation des données ---
-    # === Cas ===
-    annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2026, value=(1997, 2023))
-    df_cas = hm.copy()
-    df_cas = df_cas[
-        (df_cas["annee_diag"] >= annees_min_max[0]) &
-        (df_cas["annee_diag"] <= annees_min_max[1])
-    ]
-
-    # Harmonisation du sexe
-    df_cas["sexe"] = df_cas["sex"].map({1: "Homme", 2: "Femme"})
-
-    # Attribution du département à partir du code INSEE
-    df_cas["Code_INSEE_AuDiag"] = df_cas["Code_INSEE_AuDiag"].astype(str)
-    df_cas["code_dep"] = df_cas["Code_INSEE_AuDiag"].str[:2]
-    df_cas["departement"] = df_cas["code_dep"].map({
-        "14": "Calvados",
-        "50": "Manche",
-        "61": "Orne"
-    })
-    df_cas = df_cas[df_cas["departement"].notna()]
-
-    # Ajout des tranches d'âge
-    def get_age_tranche(age):
-        if pd.isna(age):
-            return np.nan
-        tranche = int(age // 5 * 5)
-        return "95+" if tranche >= 95 else f"{tranche}-{tranche+4}"
-
-    df_cas["age_tranche"] = df_cas["age"].apply(get_age_tranche)
-
     # === Population ===
     df_pop = pd.read_excel("populations.XLSX")  # colonnes : annee, zone, sexe, 0-4, 5-9, ..., 85+
     # Supprimer la première colonne (par position)
@@ -677,6 +643,241 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     ).dropna(subset=["population"])
 
     #st.dataframe(df_pop_long)
+
+
+    def get_age_tranche(age):
+        """
+        Calcule la tranche d'âge par pas de 5 ans.
+        Ex: 53 -> "50-54", 97 -> "95+"
+        """
+        if pd.isna(age):
+            return np.nan
+        tranche = int(age // 5 * 5)
+        return "95+" if tranche >= 95 else f"{tranche}-{tranche+4}"
+
+    # --- 1. PRÉPARATION DES DONNÉES ---
+    df_cas = hm.copy()
+
+    # Harmonisation sexe
+    df_cas["sexe"] = df_cas["sex"].map({1: "Homme", 2: "Femme"})
+
+    # Attribution département
+    df_cas["Code_INSEE_AuDiag"] = df_cas["Code_INSEE_AuDiag"].astype(str)
+    df_cas["code_dep"] = df_cas["Code_INSEE_AuDiag"].str[:2]
+    df_cas["departement"] = df_cas["code_dep"].map({
+        "14": "Calvados",
+        "50": "Manche",
+        "61": "Orne"
+    })
+
+    # Dates et suppression des valeurs hors zone
+    df_cas["DateDernieresNouvelles"] = pd.to_datetime(df_cas["DateDernieresNouvelles"], errors='coerce')
+    df_cas = df_cas[df_cas["departement"].notna()]
+
+    # --- 2. DÉFINITION DES VARIABLES DE BOUCLE ---
+    # On définit ces listes ICI pour qu'elles soient disponibles pour la prévalence ET l'incidence
+    departements = ["Calvados", "Manche", "Orne"]
+    sexes = ["Homme", "Femme"]
+    annees_etude = sorted(df_cas["annee_diag"].unique())
+
+    # --- 3. CALCUL PRÉVALENCE ---
+    if not df_cas.empty:
+        resultats_prevalence = []
+
+        for annee in annees_etude:
+            date_pivot = pd.Timestamp(year=annee, month=12, day=31)
+            
+            # Filtres
+            mask_diag = df_cas["annee_diag"] <= annee
+            mask_vivant = (df_cas["event"] != 1) | (df_cas["DateDernieresNouvelles"] > date_pivot)
+            
+            df_prev_annee = df_cas[mask_diag & mask_vivant].copy()
+
+            if not df_prev_annee.empty:
+                # Vieillissement
+                df_prev_annee["age_actuel"] = df_prev_annee["age"] + (annee - df_prev_annee["annee_diag"])
+                df_prev_annee["age_tranche"] = df_prev_annee["age_actuel"].apply(get_age_tranche)
+
+                # Agrégation des cas (C'est ici que l'erreur arrivait)
+                prev_grouped = df_prev_annee.groupby(["departement", "sexe", "age_tranche"]).size().reset_index(name="n_cas")
+
+                for dep in departements:
+                    for sexe in sexes:
+                        # On récupère la pop correspondante dans df_pop_long
+                        pop_locale = df_pop_long[
+                            (df_pop_long["zone"] == dep) & 
+                            (df_pop_long["sexe"] == sexe) & 
+                            (df_pop_long["annee"] == annee)
+                        ]
+
+                        # Fusion
+                        df_merged = pd.merge(
+                            pop_locale, 
+                            prev_grouped[prev_grouped["departement"] == dep], 
+                            on=["sexe", "age_tranche"], 
+                            how="left"
+                        ).fillna(0)
+
+                        for _, row in df_merged.iterrows():
+                            resultats_prevalence.append({
+                                "Année": annee,
+                                "Département": dep,
+                                "Sexe": sexe,
+                                "Tranche_Age": row["age_tranche"],
+                                "Nombre_Cas": row["n_cas"],
+                                "Population": row["population"],
+                                "Taux_Prevalence": round((row["n_cas"] / row["population"] * 100000), 2) if row["population"] > 0 else 0
+                            })
+
+        df_prevalence_finale = pd.DataFrame(resultats_prevalence)
+        st.title(f"📈 Taux de prévalence (pour 100 000 habitants) - {hm_libelle}")
+
+        st.dataframe(df_prevalence_finale)
+    else:
+        st.error("Le DataFrame df_cas est vide après filtrage des départements (14, 50, 61).")
+
+
+    import altair as alt
+
+    # --- 1. Préparation des Données pour le Graphique ---
+
+    # A. Créer le total "Tous Départements"
+    df_tous_dep = df_prevalence_finale.groupby(["Année", "Sexe"]).agg({
+        "Nombre_Cas": "sum",
+        "Population": "sum"
+    }).reset_index()
+    df_tous_dep["Département"] = "Tous Départements"
+
+    # Combiner avec les données par département
+    df_plot = pd.concat([df_prevalence_finale, df_tous_dep], ignore_index=True)
+
+    # B. Créer le total "Tous Sexes Confoundus"
+    df_tous_sexes = df_plot.groupby(["Année", "Département"]).agg({
+        "Nombre_Cas": "sum",
+        "Population": "sum"
+    }).reset_index()
+    df_tous_sexes["Sexe"] = "Tous Sexes"
+
+    # Combiner pour obtenir le DataFrame final pour le graphique
+    df_plot_final = pd.concat([df_plot, df_tous_sexes], ignore_index=True)
+
+    # Calculer le taux brut global pour le graphique
+    df_plot_final["Taux_Prevalence_Brut"] = (
+        (df_plot_final["Nombre_Cas"] / df_plot_final["Population"]) * 100000
+    ).round(2)
+
+    # --- 2. Fonction pour Créer le Graphique Altair ---
+
+    def creer_graphique_prevalence(data, titre_sexe):
+        """
+        Crée un histogramme interactif de la prévalence par département au fil des années.
+        """
+        
+        # Définir l'ordre des départements pour l'axe X (avec 'Tous Départements' en dernier)
+        ordre_dep = ["Calvados", "Manche", "Orne", "Tous Départements"]
+
+        chart = alt.Chart(data).mark_bar().encode(
+            # Axe X : Départements, triés
+            x=alt.X('Département:N', sort=ordre_dep, title='Zone Géographique'),
+            
+            # Axe Y : Taux de Prévalence
+            y=alt.Y('Taux_Prevalence_Brut:Q', title='Taux de Prévalence brute (pour 100 000 hab.)'),
+            
+            # Couleur : Année (échelle temporelle)
+            color=alt.Color('Année:O', scale=alt.Scale(scheme='category20b'), title='Année'),
+            
+            # Tooltip pour l'interactivité au survol
+            tooltip=['Année', 'Département', 'Sexe', 'Nombre_Cas', 'Population', alt.Tooltip('Taux_Prevalence_Brut', title='Taux (brut)')]
+        ).properties(
+            title=f"Évolution de la Prévalence brute de {titre_sexe} par Département",
+            width=alt.Step(80) # Largeur des barres
+        ).interactive() # Permet le zoom et le déplacement
+
+        return chart
+
+    # --- 3. Affichage dans Streamlit avec des Onglets ---
+
+    st.write("---")
+    st.subheader("Visualisation Graphique de la Prévalence")
+
+    # Création des onglets pour séparer les graphiques
+    tab_homme, tab_femme, tab_tous = st.tabs(["Hommes", "Femmes", "Tous Sexes"])
+
+    with tab_homme:
+        # Filtrer pour les hommes uniquement (en excluant 'Tous Sexes')
+        data_homme = df_plot_final[df_plot_final["Sexe"] == "Homme"]
+        if not data_homme.empty:
+            chart_homme = creer_graphique_prevalence(data_homme, "des Hommes")
+            st.altair_chart(chart_homme, use_container_width=True)
+        else:
+            st.warning("Pas de données disponibles pour les hommes.")
+
+    with tab_femme:
+        # Filtrer pour les femmes uniquement (en excluant 'Tous Sexes')
+        data_femme = df_plot_final[df_plot_final["Sexe"] == "Femme"]
+        if not data_femme.empty:
+            chart_femme = creer_graphique_prevalence(data_femme, "des Femmes")
+            st.altair_chart(chart_femme, use_container_width=True)
+        else:
+            st.warning("Pas de données disponibles pour les femmes.")
+
+    with tab_tous:
+        # Filtrer pour 'Tous Sexes' uniquement
+        data_tous = df_plot_final[df_plot_final["Sexe"] == "Tous Sexes"]
+        if not data_tous.empty:
+            # On regroupe par année et département pour le graphique 'Tous Sexes'
+            data_tous_grouped = data_tous.groupby(["Année", "Département"]).agg({
+                "Nombre_Cas": "sum",
+                "Population": "sum"
+            }).reset_index()
+            data_tous_grouped["Sexe"] = "Tous Sexes"
+            data_tous_grouped["Taux_Prevalence_Brut"] = (
+                (data_tous_grouped["Nombre_Cas"] / data_tous_grouped["Population"]) * 100000
+            ).round(2)
+
+            chart_tous = creer_graphique_prevalence(data_tous_grouped, "(Tous Sexes Confondus)")
+            st.altair_chart(chart_tous, use_container_width=True)
+        else:
+            st.warning("Pas de données disponibles pour 'Tous Sexes'.")
+
+
+
+
+    #### INCIDENCE ####
+    st.title(f"📈 Taux d'incidence (pour 100 000 habitants) - {hm_libelle}")
+
+    ### --- 1. Chargement et préparation des données ---
+    # === Cas ===
+    annees_min_max = st.slider("Choisir l'intervalle des années", min_value=1994, max_value=2026, value=(1997, 2023))
+    df_cas = hm.copy()
+    df_cas = df_cas[
+        (df_cas["annee_diag"] >= annees_min_max[0]) &
+        (df_cas["annee_diag"] <= annees_min_max[1])
+    ]
+
+    # Harmonisation du sexe
+    df_cas["sexe"] = df_cas["sex"].map({1: "Homme", 2: "Femme"})
+
+    # Attribution du département à partir du code INSEE
+    df_cas["Code_INSEE_AuDiag"] = df_cas["Code_INSEE_AuDiag"].astype(str)
+    df_cas["code_dep"] = df_cas["Code_INSEE_AuDiag"].str[:2]
+    df_cas["departement"] = df_cas["code_dep"].map({
+        "14": "Calvados",
+        "50": "Manche",
+        "61": "Orne"
+    })
+    df_cas = df_cas[df_cas["departement"].notna()]
+
+    # Ajout des tranches d'âge
+    def get_age_tranche(age):
+        if pd.isna(age):
+            return np.nan
+        tranche = int(age // 5 * 5)
+        return "95+" if tranche >= 95 else f"{tranche}-{tranche+4}"
+
+    df_cas["age_tranche"] = df_cas["age"].apply(get_age_tranche)
+
+
 
     ### --- 2. Agrégation des cas par groupe ---
 
