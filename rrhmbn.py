@@ -13,6 +13,8 @@ import plotly.subplots as sp
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
+import altair as alt
+
 
 
 st.set_page_config(page_title="RRHMBN - Import des données", layout="wide")
@@ -737,110 +739,74 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         st.error("Le DataFrame df_cas est vide après filtrage des départements (14, 50, 61).")
 
 
-    import altair as alt
+    # --- 1. Préparation du DataFrame pour la visualisation ---
 
-    # --- 1. Préparation des Données pour le Graphique ---
-
-    # A. Créer le total "Tous Départements"
-    df_tous_dep = df_prevalence_finale.groupby(["Année", "Sexe"]).agg({
+    # A. Les données de base (par département, sexe, année)
+    # On agrège par strate d'âge pour avoir le total par département/sexe/année
+    df_base = df_prevalence_finale.groupby(["Année", "Département", "Sexe"]).agg({
         "Nombre_Cas": "sum",
         "Population": "sum"
     }).reset_index()
-    df_tous_dep["Département"] = "Tous Départements"
 
-    # Combiner avec les données par département
-    df_plot = pd.concat([df_prevalence_finale, df_tous_dep], ignore_index=True)
-
-    # B. Créer le total "Tous Sexes Confoundus"
-    df_tous_sexes = df_plot.groupby(["Année", "Département"]).agg({
+    # B. Création du total "Tous Départements" (par sexe et année)
+    df_reg_sexe = df_base.groupby(["Année", "Sexe"]).agg({
         "Nombre_Cas": "sum",
         "Population": "sum"
     }).reset_index()
-    df_tous_sexes["Sexe"] = "Tous Sexes"
+    df_reg_sexe["Département"] = "Tous Départements"
 
-    # Combiner pour obtenir le DataFrame final pour le graphique
-    df_plot_final = pd.concat([df_plot, df_tous_sexes], ignore_index=True)
+    # C. Création du total "Tous Sexes" (par département et année)
+    df_dep_tous_sexes = df_base.groupby(["Année", "Département"]).agg({
+        "Nombre_Cas": "sum",
+        "Population": "sum"
+    }).reset_index()
+    df_dep_tous_sexes["Sexe"] = "Tous Sexes"
 
-    # Calculer le taux brut global pour le graphique
-    df_plot_final["Taux_Prevalence_Brut"] = (
-        (df_plot_final["Nombre_Cas"] / df_plot_final["Population"]) * 100000
-    ).round(2)
+    # D. Création du total ultime "Tous Départements" ET "Tous Sexes"
+    df_reg_tous_sexes = df_dep_tous_sexes.groupby("Année").agg({
+        "Nombre_Cas": "sum",
+        "Population": "sum"
+    }).reset_index()
+    df_reg_tous_sexes["Département"] = "Tous Départements"
+    df_reg_tous_sexes["Sexe"] = "Tous Sexes"
 
-    # --- 2. Fonction pour Créer le Graphique Altair ---
+    # E. Fusion de tous les blocs
+    df_visu = pd.concat([df_base, df_reg_sexe, df_dep_tous_sexes, df_reg_tous_sexes], ignore_index=True)
 
-    def creer_graphique_prevalence(data, titre_sexe):
-        """
-        Crée un histogramme interactif de la prévalence par département au fil des années.
-        """
-        
-        # Définir l'ordre des départements pour l'axe X (avec 'Tous Départements' en dernier)
+    # Calcul du taux final pour l'affichage
+    df_visu["Taux_Prevalence_Brut"] = (df_visu["Nombre_Cas"] / df_visu["Population"] * 100000).round(2)
+    
+    def generer_graph_grouped(data, titre):
         ordre_dep = ["Calvados", "Manche", "Orne", "Tous Départements"]
-
+        
         chart = alt.Chart(data).mark_bar().encode(
-            # Axe X : Départements, triés
-            x=alt.X('Département:N', sort=ordre_dep, title='Zone Géographique'),
-            
-            # Axe Y : Taux de Prévalence
-            y=alt.Y('Taux_Prevalence_Brut:Q', title='Taux de Prévalence brute (pour 100 000 hab.)'),
-            
-            # Couleur : Année (échelle temporelle)
-            color=alt.Color('Année:O', scale=alt.Scale(scheme='category20b'), title='Année'),
-            
-            # Tooltip pour l'interactivité au survol
-            tooltip=['Année', 'Département', 'Sexe', 'Nombre_Cas', 'Population', alt.Tooltip('Taux_Prevalence_Brut', title='Taux (brut)')]
+            x=alt.X('Département:N', sort=ordre_dep, title=None),
+            xOffset='Année:O',
+            y=alt.Y('Taux_Prevalence_Brut:Q', title='Taux pour 100 000 hab.'),
+            color=alt.Color('Année:O', scale=alt.Scale(scheme='tableau10')),
+            tooltip=['Année', 'Département', 'Nombre_Cas', 'Taux_Prevalence_Brut']
         ).properties(
-            title=f"Évolution de la Prévalence brute de {titre_sexe} par Département",
-            width=alt.Step(80) # Largeur des barres
-        ).interactive() # Permet le zoom et le déplacement
-
+            title=f"Prévalence : {titre}",
+            width=alt.Step(30)
+        ).interactive()
+        
         return chart
 
-    # --- 3. Affichage dans Streamlit avec des Onglets ---
+    # --- Affichage Streamlit ---
+    st.subheader("Graphiques de Prévalence par Département")
+    tab1, tab2, tab3 = st.tabs(["♂ Hommes", "♀ Femmes", "👫 Tous Sexes"])
 
-    st.write("---")
-    st.subheader("Visualisation Graphique de la Prévalence")
+    with tab1:
+        data_h = df_visu[df_visu["Sexe"] == "Homme"]
+        st.altair_chart(generer_graph_grouped(data_h, "Hommes"), width='stretch')
 
-    # Création des onglets pour séparer les graphiques
-    tab_homme, tab_femme, tab_tous = st.tabs(["Hommes", "Femmes", "Tous Sexes"])
+    with tab2:
+        data_f = df_visu[df_visu["Sexe"] == "Femme"]
+        st.altair_chart(generer_graph_grouped(data_f, "Femmes"), width='stretch')
 
-    with tab_homme:
-        # Filtrer pour les hommes uniquement (en excluant 'Tous Sexes')
-        data_homme = df_plot_final[df_plot_final["Sexe"] == "Homme"]
-        if not data_homme.empty:
-            chart_homme = creer_graphique_prevalence(data_homme, "des Hommes")
-            st.altair_chart(chart_homme, use_container_width=True)
-        else:
-            st.warning("Pas de données disponibles pour les hommes.")
-
-    with tab_femme:
-        # Filtrer pour les femmes uniquement (en excluant 'Tous Sexes')
-        data_femme = df_plot_final[df_plot_final["Sexe"] == "Femme"]
-        if not data_femme.empty:
-            chart_femme = creer_graphique_prevalence(data_femme, "des Femmes")
-            st.altair_chart(chart_femme, use_container_width=True)
-        else:
-            st.warning("Pas de données disponibles pour les femmes.")
-
-    with tab_tous:
-        # Filtrer pour 'Tous Sexes' uniquement
-        data_tous = df_plot_final[df_plot_final["Sexe"] == "Tous Sexes"]
-        if not data_tous.empty:
-            # On regroupe par année et département pour le graphique 'Tous Sexes'
-            data_tous_grouped = data_tous.groupby(["Année", "Département"]).agg({
-                "Nombre_Cas": "sum",
-                "Population": "sum"
-            }).reset_index()
-            data_tous_grouped["Sexe"] = "Tous Sexes"
-            data_tous_grouped["Taux_Prevalence_Brut"] = (
-                (data_tous_grouped["Nombre_Cas"] / data_tous_grouped["Population"]) * 100000
-            ).round(2)
-
-            chart_tous = creer_graphique_prevalence(data_tous_grouped, "(Tous Sexes Confondus)")
-            st.altair_chart(chart_tous, use_container_width=True)
-        else:
-            st.warning("Pas de données disponibles pour 'Tous Sexes'.")
-
-
+    with tab3:
+        data_t = df_visu[df_visu["Sexe"] == "Tous Sexes"]
+        st.altair_chart(generer_graph_grouped(data_t, "Tous Sexes Confondus"), width='stretch')
 
 
     #### INCIDENCE ####
