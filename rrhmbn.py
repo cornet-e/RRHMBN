@@ -167,7 +167,21 @@ if file is not None:
             how="left"
         )
 
+        # Merge avec data EDI (geocodage)
 
+        edi = pd.read_excel("Geocodage_2010-2021.xlsx", engine="openpyxl")
+        
+        # merge sur ID_TUM
+        df_final = df_final.merge(
+            edi[[
+                "ID_TUM","EDI","QUINTILE"
+            ]],
+            left_on="NoHemato",
+            right_on="ID_TUM",
+            how="left"
+        )
+
+        df_final = df_final.drop(columns=["ID_TUM"])
 
         # --- Sauvegarde du fichier filtré ---
         # fichier_sortie = "rrhmbn.xlsx"
