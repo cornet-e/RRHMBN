@@ -8,6 +8,7 @@ import pickle
 from lifelines import KaplanMeierFitter
 from lifelines.statistics import logrank_test
 from lifelines.statistics import multivariate_logrank_test
+from plotly.subplots import make_subplots
 import plotly.graph_objs as go
 import plotly.subplots as sp
 import matplotlib.pyplot as plt
@@ -1675,7 +1676,8 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     fig2.update_layout(
         height=300 * rows, width=700,
         title_text=f"{hm_libelle} - Survie selon sexe ET groupe d'âge",
-        template="plotly_white"
+        template="plotly_white",
+        hovermode="x"
     )
 
     st.plotly_chart(fig2, width='stretch')
@@ -1807,7 +1809,8 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     fig3.update_layout(
         height=300 * rows, width=700,
         title_text=f"{hm_libelle} - Survie selon sexe ET groupe d'âge (tranches définies)",
-        template="plotly_white"
+        template="plotly_white",
+        hovermode="x"
     )
 
     st.plotly_chart(fig3, width='stretch')
@@ -1958,7 +1961,8 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     fig4.update_layout(
         height=300 * rows, width=700,
         title_text=f"{hm_libelle} - Survie selon sexe ET groupe d'âge par quartiles",
-        template="plotly_white"
+        template="plotly_white",
+        hovermode="x"
     )
 
     st.plotly_chart(fig4, width='stretch')
@@ -2078,7 +2082,8 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     fig5.update_layout(
         height=300 * rows, width=800,
         title_text=f"{hm_libelle} - Survie selon sexe et période de diagnostic",
-        template="plotly_white"
+        template="plotly_white",
+        hovermode="x"
     )
 
     st.plotly_chart(fig5, width='stretch')
@@ -2170,7 +2175,8 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     fig6.update_layout(
         height=400, width=1000,
         title=f"{hm_libelle} – Survie selon la période de diagnostic\n par sexe",
-        template="plotly_white"
+        template="plotly_white",
+        hovermode="x"
     )
 
     st.plotly_chart(fig6, width='stretch')
@@ -2302,142 +2308,78 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     fig7.update_layout(
         height=300 * rows, width=700,
         title_text=f"{hm_libelle} - Survie selon sexe ET quintile d'EDI",
-        template="plotly_white"
+        template="plotly_white",
+        hovermode="x"
     )
 
     st.plotly_chart(fig7, width='stretch')
 
 
-    # ### Survie par Quintiles d'EDI selon sexe
-    # hm8 = hm.copy()
-    
-    # # Préparer les données pour survie
-    # df8 = hm8[['fup', 'event', 'sex', 'QUINTILE']].dropna()
-    # df8['sex'] = df8['sex'].astype(str)
-    # df8 = df8[df8['QUINTILE'] != 'nan']
+    ### Survie par Quintiles d'EDI selon sexe
+    # 1. Nettoyage strict des données
+    df8 = hm.copy()[['fup', 'event', 'sex', 'QUINTILE']].dropna()
+    # On s'assure que QUINTILE est une chaîne sans espaces ni virgules flottantes
+    df8['QUINTILE'] = df8['QUINTILE'].astype(float).astype(int).astype(str).str.strip()
 
-    # # Calculer p-values log-rank par sexe
-    # # p_values_sex = []
-    # # for grp in df8['sex'].unique():
-    # #     grp_data = df8[df8['sex'] == sex]
-    # #     quintiles = grp_data['QUINTILE'].unique()
-    # #     if len(quintiles) > 1:
-    # #         result = logrank_test(
-    # #             grp_data[grp_data['QUINTILE'] == quintiles[1]]['fup'],
-    # #             grp_data[grp_data['QUINTILE'] == quintiles[2]]['fup'],
-    # #             grp_data[grp_data['QUINTILE'] == quintiles[1]]['event'],
-    # #             grp_data[grp_data['QUINTILE'] == quintiles[2]]['event'],
-    # #             grp_data[grp_data['QUINTILE'] == quintiles[3]]['fup'],
-    # #             grp_data[grp_data['QUINTILE'] == quintiles[4]]['fup'],
-    # #             grp_data[grp_data['QUINTILE'] == quintiles[3]]['event'],
-    # #             grp_data[grp_data['QUINTILE'] == quintiles[4]]['event'],
-    # #             grp_data[grp_data['QUINTILE'] == quintiles[5]]['fup'],
-    # #             grp_data[grp_data['QUINTILE'] == quintiles[5]]['event']
-    # #         )
-    # #         p_values_sex.append((grp, result.p_value))
-    # #     else:
-    # #         p_values_sex.append((grp, None))
+    # 2. Dictionnaire de couleurs (clés en strings "1", "2", etc.)
+    colors_edi = {
+        "1": "#2c7bb6", # Bleu
+        "2": "#abd9e9", # Bleu clair
+        "3": "#4daf4a", # Vert
+        "4": "#fdae61", # Orange
+        "5": "#d7191c"  # Rouge
+    }
 
-    # # pval_sex_df = pd.DataFrame(p_values_sex, columns=["Sexe", "P-value"])
-    # # st.write("### P-values log-rank par sex")
-    # # st.table(pval_sex_df)
+    groupes_affichage = ["1", "2", "Tous"]
+    titres = ["Hommes", "Femmes", "Tous les patients"]
 
-    # # Tracer les courbes Kaplan-Meier facettées sur les groupes d'âge (quartiles)
-    # groupes_sex = df8['sex'].unique()
-    # colors = {"1": "blue", "2": "red"}  # Ajuster selon codage sex
-    # line_types = {"1": "solid", "2": "solid"}
+    fig8 = make_subplots(rows=1, cols=3, subplot_titles=titres, shared_yaxes=True)
+    kmf = KaplanMeierFitter()
 
-    # cols = 2
-    # rows = (len(groupes_sex) + 1) // cols
-    # fig8 = sp.make_subplots(rows=rows, cols=cols, subplot_titles=[f"Sexe {sex}" for sex in groupes_sex])
+    for idx, grp_sex in enumerate(groupes_affichage):
+        col_idx = idx + 1
+        
+        # Filtrage par sexe
+        if grp_sex == "Tous":
+            data_sex = df8.copy()
+        else:
+            # On force la comparaison en string
+            data_sex = df8[df8['sex'].astype(str).str.contains(grp_sex)]
 
-    # kmf = KaplanMeierFitter()
+        # On récupère les quintiles présents et on les trie
+        edi_presents = sorted(data_sex['QUINTILE'].unique())
 
-    # for i, sex in enumerate(groupes_sex):
-    #     subset = df8[df8['sex'] == sex]
-    #     if len(subset) == 0:
-    #         continue
-
-    #     row = i // cols + 1
-    #     col = i % cols + 1
-
-    #     for quintile in subset['QUINTILE'].unique():
-    #         quintile_subset = subset[subset['QUINTILE'] == quintile]
-    #         if len(quintile_subset) == 0:
-    #             continue
-
-    #         kmf.fit(quintile_subset['fup'], quintile_subset['event'], label=f"Quintile {quintile}")
-
-    #         fig8.add_trace(
-    #             go.Scatter(
-    #                 x=kmf.survival_function_.index,
-    #                 y=kmf.survival_function_[f"Sexe {quintile}"],
-    #                 mode='lines',
-    #                 name=f"Quintile {quintile}- {sex}",
-    #                 line=dict(color=colors.get(sex, "gray"), dash=line_types.get(sex, "solid"))
-    #             ),
-    #             row=row, col=col
-    #         )
-
-    #         # # IC
-    #         # if str(sex).lower() in ['homme', '1', 'm']:
-    #         #     couleur_remplissage = 'rgba(0, 100, 255, 0.2)'  # Bleu transparent
-    #         # else:
-    #         #     couleur_remplissage = 'rgba(255, 50, 50, 0.2)'   # Rouge transparent
-
-    #         # fig8.add_trace(
-    #         #     go.Scatter(
-    #         #         x=kmf.confidence_interval_.index,
-    #         #         y=kmf.confidence_interval_[f"Sexe {sex}_upper_0.95"],
-    #         #         mode='lines',
-    #         #         line=dict(width=0),
-    #         #         showlegend=False,
-    #         #         hoverinfo='skip'
-    #         #     ),
-    #         #     row=row, col=col
-    #         # )
+        for edi in edi_presents:
+            subset = data_sex[data_sex['QUINTILE'] == edi]
             
-    #         # fig8.add_trace(
-    #         #     go.Scatter(
-    #         #         x=kmf.confidence_interval_.index,
-    #         #         y=kmf.confidence_interval_[f"Sexe {sex}_lower_0.95"],
-    #         #         fill='tonexty',
-    #         #         fillcolor=couleur_remplissage,
-    #         #         mode='lines',
-    #         #         line=dict(width=0),
-    #         #         name=f"IC 95% {sex}",
-    #         #         showlegend=False,
-    #         #         hoverinfo='skip'
-    #         #     ),
-    #         #     row=row, col=col
-    #         # )
+            if len(subset) > 0:
+                # On fit sans label spécifique pour éviter les erreurs de colonnes
+                kmf.fit(subset['fup'], subset['event'])
+                
+                # Récupération de la couleur avec sécurité
+                couleur = colors_edi.get(edi, "black") # Noir si toujours pas trouvé
+                
+                fig8.add_trace(
+                    go.Scatter(
+                        x=kmf.survival_function_.index,
+                        y=kmf.survival_function_.iloc[:, 0], # Première colonne
+                        mode='lines',
+                        name=f"EDI {edi}",
+                        line=dict(color=couleur, width=2.5),
+                        legendgroup=edi,
+                        showlegend=(idx == 0)
+                    ),
+                    row=1, col=col_idx
+                )
 
-    #         #             # --- LIGNES DE PROJECTION DE LA MÉDIANE ---
-    #         # medians_subset[sex]=kmf.median_survival_time_
-    #         # m_val = medians_subset.get(sex, np.nan)
-            
-    #         # if pd.notnull(m_val) and not np.isinf(m_val):
-    #         #     # Ligne horizontale (de 0 à la médiane)
-    #         #     fig7.add_shape(
-    #         #         type="line", x0=0, y0=0.5, x1=m_val, y1=0.5,
-    #         #         line=dict(color="gray", width=1, dash="dash"),
-    #         #         row=row, col=col
-    #         #     )
-    #         #     # Ligne verticale (de la médiane vers l'axe X)
-    #         #     fig7.add_shape(
-    #         #         type="line", x0=m_val, y0=0.5, x1=m_val, y1=0,
-    #         #         line=dict(color="gray", width=1, dash="dash"),
-    #         #         row=row,col=col
-    #         # )
+    fig8.update_layout(
+        height=500, width=1100,
+        title_text="Survie par Quintile d'EDI et par Sexe",
+        template="plotly_white",
+        hovermode="x"
+    )
 
-
-    # fig8.update_layout(
-    #     height=300 * rows, width=700,
-    #     title_text=f"{hm_libelle} - Survie selon quintile d'EDI par sexe",
-    #     template="plotly_white"
-    # )
-
-    # st.plotly_chart(fig8, width='stretch')
+    st.plotly_chart(fig8, width='stretch')
 
 
 # --- Section : Étude de la survie relative (Pohar-Perme) ---
