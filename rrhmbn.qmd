@@ -1,0 +1,94 @@
+---
+title: "Registre Régional des Hémopathies Malignes de Basse-Normandie (RRHMBN)"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: load-packages
+#| include: false
+
+# 🔗 Dépôt CRAN fiable
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+
+# 💬 Paramètres généraux
+options(
+  stringsAsFactors = FALSE,
+  digits = 4,
+  scipen = 999
+)
+
+# 📦 Packages à charger automatiquement (s’ils sont installés)
+my_packages <- c(
+  "tidyr",
+  "dplyr",
+  "survival",
+  "popEpi",
+  "tidyverse",
+  "tidymodels",
+  "plotly",
+  "ggplot2",
+  "tibble",
+  "datetime",
+  "shiny",
+  "questionr",
+  "BiocManager",
+  # --- Packages pour la cytométrie en flux ---
+  "flowCore",
+  "flowViz",
+  "flowWorkspace",
+  "openCyto",
+  "flowAI",
+  "CytoExploreR",
+  # --- Cytométrie haut-débit (CyTOF / clustering) ---
+  "FlowSOM",
+  "cytofkit",
+  "GWalkR",
+  "skimr",
+  "gtsummary",
+  "GGally"
+)
+
+# Charge uniquement les packages déjà installés
+invisible(suppressMessages(sapply(my_packages, function(pkg) {
+  if (requireNamespace(pkg, quietly = TRUE)) {
+    library(pkg, character.only = TRUE)
+  } else {
+    message("⚠️ Le package {", pkg, "} n’est pas installé.")
+  }
+})))
+
+cat("\nBienvenue Edouard 👨‍🔬 !\n")
+cat("Les packages installés ont été chargés ✅\n")
+cat("Bonnes analyses ! 📊\n\n")
+```
+
+## Statistiques Descriptives
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Incidence
+
+Incidence.
+
+## Survie
+
+Survie.
+
+```{r}
+#| label: plot-penguins
+#| warning: false
+#| echo: false
+
+ggplot(penguins, 
+       aes(x = flipper_length_mm, y = bill_length_mm)) +
+  geom_point(aes(color = species, shape = species)) +
+  scale_color_manual(values = c("darkorange","purple","cyan4")) +
+  labs(
+    title = "Flipper and bill length",
+    subtitle = "Dimensions for penguins at Palmer Station LTER",
+    x = "Flipper length (mm)", y = "Bill length (mm)",
+    color = "Penguin species", shape = "Penguin species"
+  ) +
+  theme_minimal()
+```

@@ -18,6 +18,7 @@ import altair as alt
 
 
 
+
 st.set_page_config(page_title="RRHMBN - Import des données", layout="wide")
 st.title("📊 Analyse RRHMBN - Import des données")
 
@@ -2481,3 +2482,26 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
         
     else:
         st.warning("⚠️ La dataframe `hm` n’a pas encore été générée.")
+
+
+    # Affichage HTML
+
+    import streamlit.components.v1 as components
+
+    # lire fichier rrhmbn.html
+    with open("rrhmbn.html", "r", encoding="utf-8") as f:
+            html_content = f.read()
+    
+    st.title("Intégration HTML")
+    components.html(html_content, height=500,scrolling=True)
+
+    # lire un lien externe dans une IFrame
+
+    st.title("Intégration d'un lien HTTPS")
+
+    url_externe = "https://shiny.emvle.fr/rrhmbn_v2"
+
+    # intégration dans une Iframe
+    components.html(
+        f'<iframe src="{url_externe}" width="100%" height="600" frameborder="0"></iframe>', height=600
+    )
