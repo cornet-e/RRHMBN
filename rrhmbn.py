@@ -2492,12 +2492,12 @@ if hm_libelle and 'hm' in locals() and not hm.empty:
     with open("rrhmbn.html", "r", encoding="utf-8") as f:
             html_content = f.read()
     
-    st.title("Intégration HTML")
+    st.title("RRHMBN quarto html")
     components.html(html_content, height=500,scrolling=True)
 
     # lire un lien externe dans une IFrame
 
-    st.title("Intégration d'un lien HTTPS")
+    st.title("Etude de la survie globale")
 
     url_externe = "https://shiny.emvle.fr/rrhmbn_v2"
 
